@@ -2,14 +2,46 @@ from __future__ import annotations
 from typing import Union,List
 import docx
 from docx.shared import Inches
+        
 class BaseComponent():
     doc_target: docx.Document
 
     def __init__(self,doc_target:docx.Document) -> None:
         self.doc_target = doc_target
 
+    def delete_paragraph_by_index(self, index):
+        p = self.doc_target.paragraphs[index]._element
+        p.getparent().remove(p)
+        p._p = p._element = None
+
     def render_template(self):
-        raise NotImplementedError("not implemented")
+        raise NotImplementedError
+
+    def get_anchor_position(self,anchor_text:str)->int:
+        # 被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
+        i = -1
+        for _i,paragraph in enumerate(self.doc_target.paragraphs):
+            if anchor_text in paragraph.text:
+                i = _i
+                break
+        if i==-1: raise ValueError(f"anchor `{anchor_text}` not found") 
+        return i + 1
+        
+class Component(BaseComponent):
+    def __init__(self, doc_target: docx.Document) -> None:
+        super().__init__(doc_target)
+        self.__internal_text = Block(doc_target)
+    
+    def set_text(self, text:str):
+        self.__internal_text.add_content(content_list=Text.read(text))
+   
+    def render_template(self, anchor_text:str,  incr_next:int, incr_kw)->int:
+        offset = self.get_anchor_position(anchor_text=anchor_text)
+        while not incr_kw in self.doc_target.paragraphs[offset+incr_next].text\
+                 and (offset+incr_next)!=(len(self.doc_target.paragraphs)-1):
+            self.delete_paragraph_by_index(offset)
+            #print('deleted 1 line for anchor',anchor_text)
+        return self.__internal_text.render_block(offset)
 
 class BaseContent():
     def to_paragraph():
@@ -34,7 +66,7 @@ class Image(BaseContent):
 
 class Formula(BaseContent):
     pass
-class Metadata(BaseComponent):
+class Metadata(Component):
     school: str = None
     major: str = None
     name: str = None
@@ -92,7 +124,7 @@ class Metadata(BaseComponent):
             print(len(self.doc_target.paragraphs[line_no].runs[-1].text))
             self.doc_target.paragraphs[line_no].runs[-1].text = self.__fill_blank(BLANK_LENGTH,line_mapping[line_no])
 
-class Abstract(BaseComponent):   
+class Abstract(Component):   
     __keyword_zh_CN: Text = None
     __keyword_en: Text = None
     __text_zh_CN: Block = None
@@ -122,7 +154,7 @@ class Abstract(BaseComponent):
         #p.paragraph_format.first_line_indent = Inches(0.25)
         
         while not self.doc_target.paragraphs[abs_cn_end+2].text.startswith("关键词："):
-            delete_paragraph_by_index(self.doc_target,abs_cn_end+1)
+            self.delete_paragraph_by_index(abs_cn_end+1)
         
         # cn kw
         kw_cn_start = abs_cn_end + 2
@@ -139,7 +171,7 @@ class Abstract(BaseComponent):
 
         # https://stackoverflow.com/questions/61335992/how-can-i-use-python-to-delete-certain-paragraphs-in-docx-document
         while not self.doc_target.paragraphs[en_abs_end+2].text.startswith("Key Words："):
-            delete_paragraph_by_index(self.doc_target,en_abs_end+1)
+            self.delete_paragraph_by_index(en_abs_end+1)
 
         # en kw
         kw_en_start = en_abs_end +2
@@ -155,31 +187,12 @@ class Abstract(BaseComponent):
         
         self.doc_target.paragraphs[kw_en_start].runs[3].text = self.__keyword_en.to_paragraph()
         return kw_en_start+1
-class Conclusion(BaseComponent):
-    __text_zh_CN: Block = None
-    
-    def __init__(self, doc_target: docx.Document) -> None:
-        super().__init__(doc_target)
-        self.__text_zh_CN = Block(doc_target)
-
-    def set_conclusion(self, zh_CN:str):
-        self.__text_zh_CN.add_content(content_list=Text.read(zh_CN))
-
-    def render_template(self,offset:int=0)->int:
-        # 被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
-        i = -1
-        for _i,paragraph in enumerate(self.doc_target.paragraphs):
-            if "结    论（设计类为设计总结）" in paragraph.text[:50]:
-                i = _i
-                break
-        if i==-1: raise ValueError("anchor `结    论（设计类为设计总结）` not found") 
-        i = i + 1
-
-        # delete template content
-        while not "参 考 文 献" in self.doc_target.paragraphs[i+3].text:
-            delete_paragraph_by_index(self.doc_target,i)
-
-        return self.__text_zh_CN.render_block(i)
+class Conclusion(Component):
+    def render_template(self) -> int:
+        ANCHOR = "结    论（设计类为设计总结）"
+        incr_next = 3
+        incr_kw = "参 考 文 献"
+        return super().render_template(ANCHOR, incr_next, incr_kw)
 
 
 # class Chapter(BaseComponent): #4
@@ -238,11 +251,22 @@ class References(): #参考文献
 class Appendixes(): #附录abcdefg
     pass
 
-class ChangeRecord(): #修改记录
-    pass
+class ChangeRecord(Component): #修改记录
+    def render_template(self) -> int:
+        # fixme: this anchor doesn't work, need to traverse backwards.
+        # add API in render_template?
+        ANCHOR = "修改记录"
+        incr_next = 3
+        incr_kw = "致    谢"
+        return super().render_template(ANCHOR,incr_next,incr_kw)
 
-class Acknowledgments(): #致谢
-    pass
+class Acknowledgments(Component): #致谢
+    def render_template(self) -> int:
+        ANCHOR = "致    谢"
+        incr_next = 0
+        incr_kw = "/\,.;'" #hack: 已经是文件末尾，直接让他删到最后一行
+        return super().render_template(ANCHOR,incr_next,incr_kw)
+    
 
 class Block(BaseComponent): #content
     # 每个block是多个image，formula，text的组合，内部有序
@@ -345,11 +369,6 @@ class MD2Paper():
     def __init__(self) -> None:
         pass
 
-def delete_paragraph_by_index(doc:docx.Document,index:int):
-    p = doc.paragraphs[index]._element
-    p.getparent().remove(p)
-    p._p = p._element = None
-
 if __name__ == "__main__":
     doc = docx.Document("毕业设计（论文）模板-docx.docx")
     # meta = Metadata(doc_target=doc)
@@ -387,7 +406,21 @@ But if you know for sure none of those are present, these few lines should get t
 这里看上去有点奇怪，每个状态对象都只有静态方法，并没有存储任何的实例属性数据。 实际上，所有状态信息都只存储在 Connection 实例中。 
 在基类中定义的 NotImplementedError 是为了确保子类实现了相应的方法。 这里你或许还想使用8.12小节讲解的抽象基类方式。
 设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
-    conc.set_conclusion(e)
+    #conc.set_conclusion(e)
+    conc.set_text(e)
     conc.render_template()
+
+    ack = Acknowledgments(doc)
+    f = """肾衰竭（Kidney failure）是一种终末期的肾脏疾病，此时肾脏的功能会低于其正常水平的15%。由于透析会严重影响患者的生活质量，肾移植一直是治疗肾衰竭的理想方式。但肾脏供体一直处于短缺状态，移植需等待时间约为5-10年。近日，据一篇发表于《美国移植杂志》的文章，阿拉巴马大学伯明翰分校的科学家首次成功将基因编辑猪的肾脏成功移植给一名脑死亡的人类接受者。
+研究使用的供体猪的10个关键基因经过了基因编辑，其肾脏的功能更适合人体，且植入人体后引发的免疫排斥反应更轻微。研究人员首先对异种供体和接受者进行交叉配型测试。经配对后，研究人员将肾脏移植入脑死亡接受者的肾脏对应的解剖位置，与肾动脉、肾静脉和输尿管相连接。移植后，他们为患者进行了常规的免疫抑制治疗。目前，肾脏已在患者体内正常工作77小时。该研究按照1期临床试验标准进行，完全按人类供体器官的移植标准实施。研究显示，异种移植的发展在未来或可缓解世界范围器官供应压力。"""
+    ack.set_text(f)
+    ack.render_template()
+
+    cha = ChangeRecord(doc)
+    g = """在无线传能技术中，非辐射无线传能（即电磁感应充电）可以高效传输能量，但有效传输距离被限制在收发器尺寸的几倍之内；而辐射无线传能（如无线电、激光）虽然可以远距离传输能量，但需要复杂的控制机制来跟踪移动的能量接收器。
+近日，同济大学电子与信息工程学院的研究团队通过理论和实验证明，"""
+    cha.set_text(g)
+    # this doesn't work, bad anchor
+    #cha.render_template()
 
     doc.save("out.docx")
