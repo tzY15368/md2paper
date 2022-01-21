@@ -100,9 +100,10 @@ class Abstract(BaseComponent):
         self.__text_en = Block(doc_target)
         self.__text_zh_CN = Block(doc_target)
 
-    def set_keyword(self, zh_CN:str,en:str):
-        self.__keyword_en = Text(en)
-        self.__keyword_zh_CN = Text(zh_CN)
+    def set_keyword(self, zh_CN:List[str],en:List[str]):
+        SEPARATOR = "；"
+        self.__keyword_en = Text(SEPARATOR.join(en))
+        self.__keyword_zh_CN = Text(SEPARATOR.join(zh_CN))
 
     def set_text(self, zh_CN:str,en:str):
         self.__text_en.add_content(content_list=Text.read(en))
@@ -276,13 +277,13 @@ CSDN中支持通过==文本高亮==，实现文本高亮
 如果你使用的markdown编辑器不支持该便捷设置，可通过HTML标签<mark>实现：
 语法：<mark>文本高亮<mark>
 效果：文本高亮"""
-    b = """代码块中，也支持出现`。与行内代码类似，代码中连续的`，不能超过代码块最外侧的`数量。例如，要打印```（3个），代码块需使用````（4个）声明"""
+    b = ['您配吗','那匹马','进来看是否']
     
     c = """Any subsequent access to the "deleted" paragraph object will raise AttributeError, so you should be careful not to keep the reference hanging around, including as a member of a stored value of Document.paragraphs.
 The reason it's not in the library yet is because the general case is much trickier, in particular needing to detect and handle the variety of linked items that can be present in a paragraph; things like a picture, a hyperlink, or chart etc.
 But if you know for sure none of those are present, these few lines should get the job done."""
     
-    d = """you should cite the location you copied this from, as acknowledgement of the original author's work."""
+    d = ['abc','def','gh']
 
     abs.set_text(a,c)
     abs.set_keyword(b,d)
