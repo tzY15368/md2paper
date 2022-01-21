@@ -9,6 +9,13 @@ class BaseComponent():
     def __init__(self,doc_target:docx.Document) -> None:
         self.doc_target = doc_target
 
+        # delete all tables on startup as we don't need them
+        for i in range(len(self.doc_target.tables)):
+            t = doc.tables[0]._element
+            t.getparent().remove(t)
+            t._t = t._element = None
+
+
     def delete_paragraph_by_index(self, index):
         p = self.doc_target.paragraphs[index]._element
         p.getparent().remove(p)
@@ -66,6 +73,10 @@ class Image(BaseContent):
 
 class Formula(BaseContent):
     pass
+
+class Table(BaseContent):
+    pass
+
 class Metadata(Component):
     school: str = None
     major: str = None
@@ -244,9 +255,21 @@ class Conclusion(Component):
 #     def render_template(self,offset:int)->int:
 #         return super().render_template()
 
-
-class References(): #参考文献
+class MainContent(Component): # 正文
     pass
+
+class References(Component): #参考文献
+    def render_template(self) -> int:
+        ANCHOR = "参 考 文 献"
+        incr_next = 1
+        incr_kw = "附录A"
+        offset_start = self.get_anchor_position(ANCHOR)
+        offset_end = super().render_template(ANCHOR, incr_next, incr_kw) -incr_next+1
+        _style = self.doc_target.styles['参考文献正文']
+        for i in range(offset_start,offset_end):
+            self.doc_target.paragraphs[i].style = _style
+
+        
 
 class Appendixes(): #附录abcdefg
     pass
@@ -409,6 +432,12 @@ But if you know for sure none of those are present, these few lines should get t
     #conc.set_conclusion(e)
     conc.set_text(e)
     conc.render_template()
+
+    ref = References(doc)
+    h = """[1] 国家标准局信息分类编码研究所.GB/T 2659-1986 世界各国和地区名称代码[S]//全国文献工作标准化技术委员会.文献工作国家标准汇编:3.北京:中国标准出版社,1988:59-92. 
+[2] 韩吉人.论职工教育的特点[G]//中国职工教育研究会.职工教育研究论文集.北京:人民教育出版社,1985:90-99. """
+    ref.set_text(h)
+    ref.render_template()
 
     ack = Acknowledgments(doc)
     f = """肾衰竭（Kidney failure）是一种终末期的肾脏疾病，此时肾脏的功能会低于其正常水平的15%。由于透析会严重影响患者的生活质量，肾移植一直是治疗肾衰竭的理想方式。但肾脏供体一直处于短缺状态，移植需等待时间约为5-10年。近日，据一篇发表于《美国移植杂志》的文章，阿拉巴马大学伯明翰分校的科学家首次成功将基因编辑猪的肾脏成功移植给一名脑死亡的人类接受者。
