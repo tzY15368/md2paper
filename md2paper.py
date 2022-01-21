@@ -229,7 +229,7 @@ class References(Component): #参考文献
 
         
 
-class Appendixes(): #附录abcdefg
+class Appendixes(Component): #附录abcdefg
     pass
 
 class ChangeRecord(Component): #修改记录
@@ -245,7 +245,7 @@ class Acknowledgments(Component): #致谢
     def render_template(self) -> int:
         ANCHOR = "致    谢"
         incr_next = 0
-        
+
         #hack: 致谢已经到论文末尾，因此用无法匹配上的字符串直接让他删到最后一行
         incr_kw = "/\,.;'" 
         return super().render_template(ANCHOR,incr_next,incr_kw)
