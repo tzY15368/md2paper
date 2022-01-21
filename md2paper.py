@@ -112,19 +112,17 @@ class Abstract(BaseComponent):
         self.__text_en.add_content(content_list=Text.read(en))
         self.__text_zh_CN.add_content(content_list=Text.read(zh_CN))
 
-    def render_template(self, en_title='this is english title')->None:
+    def render_template(self, en_title='this is english title')->int:
         # 64开始是摘要正文
         abs_cn_start = 64
-        abs_cn_end = self.__text_zh_CN.render_block(abs_cn_start,title=False)
+        abs_cn_end = self.__text_zh_CN.render_block(abs_cn_start)
         #p = self.doc_target.paragraphs[ABSTRACT_ZH_CN_START].insert_paragraph_before(text=self.text_zh_CN.to_paragraph())
         
         # https://stackoverflow.com/questions/30584681/how-to-properly-indent-with-python-docx
         #p.paragraph_format.first_line_indent = Inches(0.25)
         
         while not self.doc_target.paragraphs[abs_cn_end+2].text.startswith("关键词："):
-            p = self.doc_target.paragraphs[abs_cn_end+1]._element
-            p.getparent().remove(p)
-            p._p = p._element = None
+            delete_paragraph_by_index(self.doc_target,abs_cn_end+1)
         
         # cn kw
         kw_cn_start = abs_cn_end + 2
@@ -136,14 +134,12 @@ class Abstract(BaseComponent):
         self.doc_target.paragraphs[en_title_start].runs[1].text = en_title
 
         en_abs_start = en_title_start + 3
-        en_abs_end = self.__text_en.render_block(en_abs_start,title=False)-1
+        en_abs_end = self.__text_en.render_block(en_abs_start)-1
         #self.doc_target.paragraphs[en_abs_start].insert_paragraph_before(text=self.__text_en.to_paragraph())
 
         # https://stackoverflow.com/questions/61335992/how-can-i-use-python-to-delete-certain-paragraphs-in-docx-document
         while not self.doc_target.paragraphs[en_abs_end+2].text.startswith("Key Words："):
-            p = self.doc_target.paragraphs[en_abs_end+1]._element
-            p.getparent().remove(p)
-            p._p = p._element = None
+            delete_paragraph_by_index(self.doc_target,en_abs_end+1)
 
         # en kw
         kw_en_start = en_abs_end +2
@@ -158,9 +154,32 @@ class Abstract(BaseComponent):
         
         
         self.doc_target.paragraphs[kw_en_start].runs[3].text = self.__keyword_en.to_paragraph()
-class Conclusion():
-    text_zh_CN: Text = None
+        return kw_en_start+1
+class Conclusion(BaseComponent):
+    __text_zh_CN: Block = None
+    
+    def __init__(self, doc_target: docx.Document) -> None:
+        super().__init__(doc_target)
+        self.__text_zh_CN = Block(doc_target)
 
+    def set_conclusion(self, zh_CN:str):
+        self.__text_zh_CN.add_content(content_list=Text.read(zh_CN))
+
+    def render_template(self,offset:int=0)->int:
+        # 被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
+        i = -1
+        for _i,paragraph in enumerate(self.doc_target.paragraphs):
+            if "结    论（设计类为设计总结）" in paragraph.text[:50]:
+                i = _i
+                break
+        if i==-1: raise ValueError("anchor `结    论（设计类为设计总结）` not found") 
+        i = i + 1
+
+        # delete template content
+        while not "参 考 文 献" in self.doc_target.paragraphs[i+3].text:
+            delete_paragraph_by_index(self.doc_target,i)
+
+        return self.__text_zh_CN.render_block(i)
 
 
 # class Chapter(BaseComponent): #4
@@ -326,6 +345,11 @@ class MD2Paper():
     def __init__(self) -> None:
         pass
 
+def delete_paragraph_by_index(doc:docx.Document,index:int):
+    p = doc.paragraphs[index]._element
+    p.getparent().remove(p)
+    p._p = p._element = None
+
 if __name__ == "__main__":
     doc = docx.Document("毕业设计（论文）模板-docx.docx")
     # meta = Metadata(doc_target=doc)
@@ -357,5 +381,13 @@ But if you know for sure none of those are present, these few lines should get t
     abs.set_text(a,c)
     abs.set_keyword(b,d)
     abs.render_template()
+
+    conc = Conclusion(doc)
+    e = """如果代码中出现太多的条件判断语句的话，代码就会变得难以维护和阅读。 这里的解决方案是将每个状态抽取出来定义成一个类。
+这里看上去有点奇怪，每个状态对象都只有静态方法，并没有存储任何的实例属性数据。 实际上，所有状态信息都只存储在 Connection 实例中。 
+在基类中定义的 NotImplementedError 是为了确保子类实现了相应的方法。 这里你或许还想使用8.12小节讲解的抽象基类方式。
+设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
+    conc.set_conclusion(e)
+    conc.render_template()
 
     doc.save("out.docx")
