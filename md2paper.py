@@ -25,7 +25,10 @@ class BaseComponent():
         raise NotImplementedError
 
     def get_anchor_position(self,anchor_text:str)->int:
-        # 被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
+        # FIXME: 需要优化
+        # 目前被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
+        # USE-WITH-CARE
+        # 只靠标题的anchor-text找paragraph很容易找错，用的时候注意
         i = -1
         for _i,paragraph in enumerate(self.doc_target.paragraphs):
             if anchor_text in paragraph.text:
@@ -41,7 +44,11 @@ class Component(BaseComponent):
     
     def set_text(self, text:str):
         self.__internal_text.add_content(content_list=Text.read(text))
-   
+
+    # anchor_text: 用于找到插入段落位置
+    # incr_next: 用于在插入新内容后往后删老模板当前段内容，
+    # 直到删除到incr_kw往前incr_next个paragraph
+    # incr_kw：见上面incr_next
     def render_template(self, anchor_text:str,  incr_next:int, incr_kw)->int:
         offset = self.get_anchor_position(anchor_text=anchor_text)
         while not incr_kw in self.doc_target.paragraphs[offset+incr_next].text\
@@ -92,9 +99,10 @@ class Metadata(Component):
         """
         填充诸如 "学 生 姓 名：______________"的域
         **一个中文算两个字符
+        fixme!!
         """
         def get_data_len(data:str)->int:
-            # 判断是否中文
+            # 判断是否中文, 一个中文算两个字符
             len = 0
             for char in data:
                 if '\u4e00' <= char <= '\u9fa5':
@@ -205,56 +213,6 @@ class Conclusion(Component):
         incr_kw = "参 考 文 献"
         return super().render_template(ANCHOR, incr_next, incr_kw)
 
-
-# class Chapter(BaseComponent): #4
-#     def __init__(self, doc_target: docx.Document, id:int) -> None:
-#         super().__init__(doc_target)
-        
-#         self.__title:str = ""
-#         self.__heading_block:Block = None
-#         self.__section_list:List[Section] = []
-#         self.__id = id
-        
-#     def set_title(self, title:str):
-#         self.__title = title
-
-#     def set_heading_block(self, block:Block):
-#         self.__heading_block = block
-
-#     def add_section(self, section:Section)->Chapter:
-#         self.__section_list.append(section)
-#         return self
-
-#     def render_template(self, offset:int)->int:
-#         p_title = self.doc_target.paragraphs[offset].insert_paragraph_before()
-#         p_title.style = doc.styles['Heading 1']
-#         p_title.add_run()
-#         p_title.runs[0].text= str(self.__id)+"  "+self.__title
-#         new_offset = offset + 1
-#         if self.__heading_block:
-#             new_offset = self.__heading_block.render_block(new_offset)
-
-#         for section in self.__section_list:
-#             new_offset = section.render_template(new_offset)
-#         return new_offset
-
-# class Section(BaseComponent): #4.1
-#     def render_template(self, offset:int)->int:
-#         pass
-#     pass
-
-# class SubSection(BaseComponent): # 4.1.1
-#     def __init__(self, doc_target: docx.Document) -> None:
-#         super().__init__(doc_target)
-#         self.__local_block:Block = None
-#         self.__title:str = ""
-
-#     def set_title(self, title:str):
-#         self.__title = title
-    
-#     def render_template(self,offset:int)->int:
-#         return super().render_template()
-
 class MainContent(Component): # 正文
     pass
 
@@ -287,7 +245,9 @@ class Acknowledgments(Component): #致谢
     def render_template(self) -> int:
         ANCHOR = "致    谢"
         incr_next = 0
-        incr_kw = "/\,.;'" #hack: 已经是文件末尾，直接让他删到最后一行
+        
+        #hack: 致谢已经到论文末尾，因此用无法匹配上的字符串直接让他删到最后一行
+        incr_kw = "/\,.;'" 
         return super().render_template(ANCHOR,incr_next,incr_kw)
     
 
