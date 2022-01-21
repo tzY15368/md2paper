@@ -1,6 +1,4 @@
 from __future__ import annotations
-from ast import Str
-from curses import raw
 from typing import Union,List
 import docx
 from docx.shared import Inches
@@ -30,7 +28,12 @@ class Text(BaseContent):
     @classmethod
     def read(cls, txt:str)->List[Text]:
         return [Text(i) for i in txt.split('\n')]
+class Image(BaseContent):
+    img_url = ""
+    img_alt = ""
 
+class Formula(BaseContent):
+    pass
 class Metadata(BaseComponent):
     school: str = None
     major: str = None
@@ -158,21 +161,57 @@ class Abstract(BaseComponent):
 class Conclusion():
     text_zh_CN: Text = None
 
-class Image(BaseContent):
-    img_url = ""
-    img_alt = ""
 
-class Formula(BaseContent):
-    pass
 
-class Chapter(): #4
-    pass
+# class Chapter(BaseComponent): #4
+#     def __init__(self, doc_target: docx.Document, id:int) -> None:
+#         super().__init__(doc_target)
+        
+#         self.__title:str = ""
+#         self.__heading_block:Block = None
+#         self.__section_list:List[Section] = []
+#         self.__id = id
+        
+#     def set_title(self, title:str):
+#         self.__title = title
 
-class Section(): #4.1
-    pass
+#     def set_heading_block(self, block:Block):
+#         self.__heading_block = block
 
-class SubSection(): # 4.1.1
-    pass
+#     def add_section(self, section:Section)->Chapter:
+#         self.__section_list.append(section)
+#         return self
+
+#     def render_template(self, offset:int)->int:
+#         p_title = self.doc_target.paragraphs[offset].insert_paragraph_before()
+#         p_title.style = doc.styles['Heading 1']
+#         p_title.add_run()
+#         p_title.runs[0].text= str(self.__id)+"  "+self.__title
+#         new_offset = offset + 1
+#         if self.__heading_block:
+#             new_offset = self.__heading_block.render_block(new_offset)
+
+#         for section in self.__section_list:
+#             new_offset = section.render_template(new_offset)
+#         return new_offset
+
+# class Section(BaseComponent): #4.1
+#     def render_template(self, offset:int)->int:
+#         pass
+#     pass
+
+# class SubSection(BaseComponent): # 4.1.1
+#     def __init__(self, doc_target: docx.Document) -> None:
+#         super().__init__(doc_target)
+#         self.__local_block:Block = None
+#         self.__title:str = ""
+
+#     def set_title(self, title:str):
+#         self.__title = title
+    
+#     def render_template(self,offset:int)->int:
+#         return super().render_template()
+
 
 class References(): #参考文献
     pass
@@ -191,11 +230,21 @@ class Block(BaseComponent): #content
     
     def __init__(self, doc_target: docx.Document) -> None:
         super().__init__(doc_target)
-        self.title:str = None
+        self.__title:str = None
         self.__content_list:List[Union[Text,Image,Formula]] = []
+        self.__sub_blocks:List[Block] = []
+        self.__id:int = None
+
+    def set_id(self, id:int):
+        self.__id = id
+
     def set_title(self,title:str) -> None:
-        self.title = title
+        self.__title = title
     
+    def add_sub_block(self,block:Block)->Block:
+        self.__sub_blocks.append(block)
+        return self
+
     def add_content(self,content:Union[Text,Image,Formula]=None,
             content_list:Union[List[Text],List[Image],List[Formula]]=[]) -> Block:
         if content:
@@ -205,33 +254,53 @@ class Block(BaseComponent): #content
         #print('added content with len',len(content_list),content_list[0].raw_text,id(self))
         return self
 
+    # render_template是基于render_block的api，增加了嵌套blocks的渲染 以支持递归生成章节/段落，
+    # 同时增加了对段落标题和段落号的支持
+    # 顺序：先title，再自己的content-list，再自己的sub-block
+    def render_template(self, offset:int)->int:
+        new_offset = offset
+        if self.__title:
+            p_title = self.doc_target.paragraphs[offset].insert_paragraph_before()
+            p_title.style = doc.styles['Heading 1']
+            p_title.add_run()
+            p_title.runs[0].text= str(self.__id) if self.__id else "" +"  "+self.__title
+            new_offset = new_offset + 1
 
-    # render_block returns the final paragraph's offset
-    def render_block(self, offset:int, title:bool=True)->int:
+        new_offset = self.render_block(new_offset)
+
+        for i,block in enumerate(self.__sub_blocks):
+            new_offset = block.render_template(new_offset) 
+
+        return new_offset
+
+
+    # render_block是最底层的api，只将自己的content-list加到已有文档给定位置
+    # render_block takes the desired paragraph position's offset,
+    # renders the block with native elements: text, image and formulas,
+    # and returns the final paragraph's offset
+    def render_block(self, offset:int)->int:
         if not self.__content_list:
-            return
-        if not title:
-            # generate necessary paragraphs
-            internal_content_list = []
-            p = self.doc_target.paragraphs[offset].insert_paragraph_before()
+            return offset
+        # generate necessary paragraphs
+        internal_content_list = []
+        p = self.doc_target.paragraphs[offset].insert_paragraph_before()
+        internal_content_list.insert(0,p)
+        for i in range(len(self.__content_list)-1):
+            p = internal_content_list[0].insert_paragraph_before()
             internal_content_list.insert(0,p)
-            for i in range(len(self.__content_list)-1):
-                p = internal_content_list[0].insert_paragraph_before()
-                internal_content_list.insert(0,p)
             
-            #print('got content list',len(internal_content_list),id(self))
-            assert len(self.__content_list)==len(internal_content_list)
-            for i in range(len(self.__content_list)):
-                #p = self.doc_target.paragraphs[offset].insert_paragraph_before()
-                if type(self.__content_list[i]) == Text:
-                    p = internal_content_list[i]
-                    p.text = self.__content_list[i].to_paragraph()
-                    p.paragraph_format.first_line_indent = Inches(0.25)
-                else:
-                    raise NotImplementedError
-            return offset + len(self.__content_list)
-        else:
-            raise NotImplementedError("title unsupported")
+        #print('got content list',len(internal_content_list),id(self))
+        assert len(self.__content_list)==len(internal_content_list)
+        for i in range(len(self.__content_list)):
+            #p = self.doc_target.paragraphs[offset].insert_paragraph_before()
+            if type(self.__content_list[i]) == Text:
+                p = internal_content_list[i]
+                p.style = self.doc_target.styles['Normal']
+                p.text = self.__content_list[i].to_paragraph()
+                p.paragraph_format.first_line_indent = Inches(0.25)
+            else:
+                raise NotImplementedError
+        return offset + len(self.__content_list)
 
 class DUTThesisPaper():
     """
