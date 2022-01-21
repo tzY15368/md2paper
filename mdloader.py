@@ -45,8 +45,12 @@ def get_content(h1, until_h1):
     conts = []
     cur = h1.next_sibling
     while cur != until_h1:
-
+        if cur.name == "table":
+            conts.append(("table", "something"))  # FIXME
+        elif cur.name != None:
+            conts.append((cur.name, rbk(cur.text)))
         cur = cur.next_sibling
+    print(conts[0])
     return conts
 
 
@@ -168,7 +172,7 @@ def load_md(file_name: str, file_type: str):
                                 extensions=['markdown.extensions.tables'])
     soup = BeautifulSoup(md_html, 'html.parser')
     for i in soup(text=lambda text: isinstance(text, Comment)):
-        i.extract()
+        i.extract()  # 删除 html 注释
 
     if file_type == "论文":
         return handle_paper(soup)
