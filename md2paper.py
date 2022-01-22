@@ -51,13 +51,7 @@ class DocManager():
 
 DM = DocManager
 
-class BaseComponent():
-
-    def render_template(self):
-        raise NotImplementedError
-
-        
-class Component(BaseComponent):
+class Component():
     def __init__(self) -> None:
         self.__internal_text = Block()
     
@@ -232,8 +226,16 @@ class Conclusion(Component):
         incr_kw = "参 考 文 献"
         return super().render_template(ANCHOR, incr_next, incr_kw)
 
-class MainContent(Component): # 正文
-    pass
+
+
+class Introduction(Component): #引言 由于正文定位依赖引言，如果没写引言，依旧会生成引言，最后删掉
+    def render_template(self) -> int:
+        anchor_text = "引    言"
+        incr_next = 2
+        incr_kw = "正文格式说明"
+        anchor_style_name = "Heading 1"
+        return super().render_template(anchor_text, incr_next, incr_kw, anchor_style_name=anchor_style_name)
+
 
 class References(Component): #参考文献
     def render_template(self) -> int:
@@ -245,10 +247,10 @@ class References(Component): #参考文献
         _style = DM.get_doc().styles['参考文献正文']
         for i in range(offset_start,offset_end):
             DM.get_doc().paragraphs[i].style = _style
-
+        return offset_end
         
 
-class Appendixes(Component): #附录abcdefg
+class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
     pass
 
 class ChangeRecord(Component): #修改记录
@@ -271,7 +273,7 @@ class Acknowledgments(Component): #致谢
         return super().render_template(ANCHOR,incr_next,incr_kw)
     
 
-class Block(BaseComponent): #content
+class Block(): #content
     # 每个block是多个image，formula，text的组合，内部有序
     
     def __init__(self) -> None:
@@ -288,7 +290,7 @@ class Block(BaseComponent): #content
     
     def add_sub_block(self,block:Block)->Block:
         self.__sub_blocks.append(block)
-        return self
+        return block
 
     def add_content(self,content:Union[Text,Image,Formula]=None,
             content_list:Union[List[Text],List[Image],List[Formula]]=[]) -> Block:
@@ -403,6 +405,13 @@ But if you know for sure none of those are present, these few lines should get t
     abs.set_text(a,c)
     abs.set_keyword(b,d)
     abs.render_template()
+
+    intro = Introduction()
+    t = """这样做违反了Liskov替代原则。换句话说，这是一个可怕的想法，B不应该是A的子类型。我只是感兴趣：您为什么要这样做？@delnan出于某种原因每当有人提到我总是想到Who Doctor的Blinovitch限制效应时。
+现在就称其为好奇心。我感谢警告，但我仍然感到好奇。
+一个用例是，如果您要使用Django库公开的Form类，但不包含其字段之一。在Django中，表单字段是由某些类属性定义的。例如，请参阅此SO问题。"""
+    intro.set_text(t)
+    intro.render_template()
 
     conc = Conclusion()
     e = """如果代码中出现太多的条件判断语句的话，代码就会变得难以维护和阅读。 这里的解决方案是将每个状态抽取出来定义成一个类。
