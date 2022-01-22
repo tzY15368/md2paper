@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Union,List
 import docx
-from docx.shared import Inches
+from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK
+import lxml
 class DocNotSetException(Exception):
     pass
 class DocManager():
@@ -49,12 +50,25 @@ class DocManager():
         if i==-1: raise ValueError(f"anchor `{anchor_text}` not found") 
         return i + 1
 
+    # https://stackoverflow.com/questions/51360649/how-to-update-table-of-contents-in-docx-file-with-python-on-linux?rq=1
+    @classmethod
+    def update_toc(cls):
+        namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        # add child to doc.settings element
+        element_updatefields = lxml.etree.SubElement(
+            cls.get_doc().settings.element, f"{namespace}updateFields"
+        )
+        element_updatefields.set(f"{namespace}val", "true")
+
 DM = DocManager
 
 class Component():
     def __init__(self) -> None:
         self.__internal_text = Block()
     
+    def get_internal_text(self)->Block:
+        return self.__internal_text
+
     def set_text(self, text:str):
         self.__internal_text.add_content(content_list=Text.read(text))
 
@@ -231,27 +245,39 @@ class MainContent(Component): # 正文
     def __init__(self) -> None:
         super().__init__()
         self.__internal_text = Block()
+        self.__last_blk:Block = None
+
+    def get_last_block(self)->Block:
+        if not self.__last_blk:
+            raise ValueError("last blk is not yet set")
+        return self.__last_blk
 
     # add_chapter returns the added chapter
     def add_chapter(self,title:str)->Block:
         new_chapter = Block()
+        self.__last_blk = new_chapter
         new_chapter.set_title(title,Block.heading_1)
         return self.__internal_text.add_sub_block(new_chapter)
     
     # add_section returns the added section
     def add_section(self, chapter:Block, title:str)->Block:
         new_section = Block()
+        self.__last_blk = new_section
         new_section.set_title(title,Block.heading_2)
         return chapter.add_sub_block(new_section)
 
     # add_subsection returns the added subsection
     def add_subsection(self, section:Block, title:str)->Block:
         new_subsection = Block()
+        self.__last_blk = new_subsection
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
 
     def set_text(self, location:Block, text:str):
         location.add_content(content_list=Text.read(text))
+
+    def append_paragraph(self, text:str):
+        self.get_last_block().add_content(Text(text))
 
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
     def render_template(self, offset:int) -> int:
@@ -284,7 +310,30 @@ class References(Component): #参考文献
         
 
 class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+
+    def add_appendix(self, appendix_title:str,appendix_content:str):
+        new_appendix = Block()
+        new_appendix.set_title(appendix_title,level=Block.heading_1)
+        new_appendix.add_content(content_list=Text.read(appendix_content))
+        self.get_internal_text().add_sub_block(new_appendix)
+
+    def render_template(self) -> int:
+        anchor_text = "附录A"
+        anchor_style_name = "Heading 1"
+        incr_next = 1
+        incr_kw = "修改记录"
+        offset = super().render_template(anchor_text, incr_next, incr_kw, anchor_style_name)
+        #此处没有覆盖原有内容，因此还需要删去原有的附录a那一页的3段
+
+        line_delete_count = 1
+        pos = DM.get_anchor_position(anchor_text=anchor_text)-1
+        #print('text:',DM.get_doc().paragraphs[pos].text)
+        for i in range(line_delete_count):
+            DM.delete_paragraph_by_index(pos)
+        return offset - line_delete_count
+    
 
 class ChangeRecord(Component): #修改记录
     def render_template(self) -> int:
@@ -395,7 +444,7 @@ class Block(): #content
                 p = internal_content_list[i]
                 p.style = DM.get_doc().styles['Normal']
                 p.text = self.__content_list[i].to_paragraph()
-                p.paragraph_format.first_line_indent = Inches(0.25)
+                p.paragraph_format.first_line_indent = Cm(0.82)#Inches(0.25)
             else:
                 raise NotImplementedError
         return offset + len(self.__content_list)
@@ -508,6 +557,12 @@ But if you know for sure none of those are present, these few lines should get t
     cha.set_text(g)
     cha.render_template()
 
+    apd = Appendixes()
+    apd.add_appendix("附录A","啊哈哈哈鸡汤来喽")
+    apd.add_appendix("附录B","直接来吧")
+    apd.render_template()
+
+    DM.update_toc()
     doc.save("out.docx")
 
     
