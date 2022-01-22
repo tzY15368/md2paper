@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Union,List
 import docx
 from docx.shared import Inches
-
+from docx.enum.text import WD_BREAK
 class DocNotSetException(Exception):
     pass
 class DocManager():
@@ -68,7 +68,7 @@ class Component():
                  and (offset+incr_next)!=(len(DM.get_doc().paragraphs)-1):
             DM.delete_paragraph_by_index(offset)
             #print('deleted 1 line for anchor',anchor_text)
-        return self.__internal_text.render_block(offset)
+        return self.__internal_text.render_template(offset)
 
 class BaseContent():
     def to_paragraph():
@@ -226,12 +226,45 @@ class Conclusion(Component):
         incr_kw = "参 考 文 献"
         return super().render_template(ANCHOR, incr_next, incr_kw)
 
+class MainContent(Component): # 正文
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.__internal_text = Block()
+
+    # add_chapter returns the added chapter
+    def add_chapter(self,title:str)->Block:
+        new_chapter = Block()
+        new_chapter.set_title(title,Block.heading_1)
+        return self.__internal_text.add_sub_block(new_chapter)
+    
+    # add_section returns the added section
+    def add_section(self, chapter:Block, title:str)->Block:
+        new_section = Block()
+        new_section.set_title(title,Block.heading_2)
+        return chapter.add_sub_block(new_section)
+
+    # add_subsection returns the added subsection
+    def add_subsection(self, section:Block, title:str)->Block:
+        new_subsection = Block()
+        new_subsection.set_title(title,Block.heading_3)
+        return section.add_sub_block(new_subsection)
+
+    def set_text(self, location:Block, text:str):
+        location.add_content(content_list=Text.read(text))
+
+    # 由于无法定位正文，需要先生成引言，再用引言返回的offset
+    def render_template(self, offset:int) -> int:
+        incr_next = 3
+        incr_kw = "结    论（设计类为设计总结"
+        while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text:
+            DM.delete_paragraph_by_index(offset)
+        return self.__internal_text.render_template(offset)
 
 class Introduction(Component): #引言 由于正文定位依赖引言，如果没写引言，依旧会生成引言，最后删掉
     def render_template(self) -> int:
         anchor_text = "引    言"
-        incr_next = 2
+        incr_next = 3
         incr_kw = "正文格式说明"
         anchor_style_name = "Heading 1"
         return super().render_template(anchor_text, incr_next, incr_kw, anchor_style_name=anchor_style_name)
@@ -275,7 +308,11 @@ class Acknowledgments(Component): #致谢
 
 class Block(): #content
     # 每个block是多个image，formula，text的组合，内部有序
-    
+    heading_1 = 1
+    heading_2 = 2
+    heading_3 = 3
+    heading_4 = 4
+
     def __init__(self) -> None:
         self.__title:str = None
         self.__content_list:List[Union[Text,Image,Formula]] = []
@@ -285,8 +322,13 @@ class Block(): #content
     def set_id(self, id:int):
         self.__id = id
 
-    def set_title(self,title:str) -> None:
+    # 由level决定标题的样式（heading1，2，3）
+    def set_title(self,title:str,level:int) -> None:
         self.__title = title
+        if level not in range(0,5):
+            raise ValueError("invalid heading level")
+        self.__level = level
+        #print('set title',self.__title)
     
     def add_sub_block(self,block:Block)->Block:
         self.__sub_blocks.append(block)
@@ -306,15 +348,25 @@ class Block(): #content
     # 顺序：先title，再自己的content-list，再自己的sub-block
     def render_template(self, offset:int)->int:
         new_offset = offset
+
+        # 如果是一级，给头上（标题前面）增加分页符
+        if self.__title and self.__level == self.heading_1:
+            p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            run = p.add_run()
+            run.add_break(WD_BREAK.PAGE)
+            new_offset = new_offset + 1
+
         if self.__title:
-            p_title = DM.get_doc().paragraphs[offset].insert_paragraph_before()
-            p_title.style = DM.get_doc().styles['Heading 1']
+            #print('title:',self.__title,'level:',self.__level)
+            p_title = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            p_title.style = DM.get_doc().styles['Heading '+str(self.__level)]
             p_title.add_run()
             p_title.runs[0].text= str(self.__id) if self.__id else "" +"  "+self.__title
             new_offset = new_offset + 1
-
+        
         new_offset = self.render_block(new_offset)
 
+        #print('has',len(self.__sub_blocks),"sub-blocks")
         for i,block in enumerate(self.__sub_blocks):
             new_offset = block.render_template(new_offset) 
 
@@ -411,7 +463,23 @@ But if you know for sure none of those are present, these few lines should get t
 现在就称其为好奇心。我感谢警告，但我仍然感到好奇。
 一个用例是，如果您要使用Django库公开的Form类，但不包含其字段之一。在Django中，表单字段是由某些类属性定义的。例如，请参阅此SO问题。"""
     intro.set_text(t)
-    intro.render_template()
+    main_start = intro.render_template()
+
+    mc = MainContent()
+    c1 = mc.add_chapter("第一章 刘姥姥")
+    s1 = mc.add_section(c1, "1.1 asdfasdf")
+    s2 = mc.add_section(c1, "1.2 bbbb")
+    h = """目前的娛樂型電腦螢幕市場，依照玩家的需求大致可以分為兩大勢力：一派是主打對戰類型
+    的電競玩家、另一派則主打追劇的多媒體影音玩家。前者需要需要高更新率的螢幕，在分秒必爭的對戰中搶得先機；後者則需要較高的解析度以及HDR的顯示內容，好用來欣賞畫面的每一個細節。"""
+    mc.set_text(c1,h)
+    mc.set_text(s2,h)
+    c2 = mc.add_chapter("第二章 菜花")
+    s3 = mc.add_section(c2,"2.1 aaa")
+    ss1 = mc.add_subsection(s3,"2.1.1 asdf")
+    mc.set_text(ss1,h)
+    c3 = mc.add_chapter("第三章 大观园")
+    mc.set_text(c3,t)
+    mc.render_template(offset=main_start)
 
     conc = Conclusion()
     e = """如果代码中出现太多的条件判断语句的话，代码就会变得难以维护和阅读。 这里的解决方案是将每个状态抽取出来定义成一个类。
