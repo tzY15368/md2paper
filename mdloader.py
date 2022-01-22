@@ -2,6 +2,9 @@ import markdown
 from bs4 import BeautifulSoup, Comment
 import logging
 import re
+from functools import reduce
+
+from md2paper import *
 
 
 # 检查
@@ -76,6 +79,10 @@ def rbk(text: str):  # remove_blank
     return text
 
 
+def assemble(texts: list[str]):
+    return reduce(lambda x, y: x+"\n"+y, texts)
+
+
 # 提取内容
 
 def get_ps(h1):
@@ -109,14 +116,25 @@ def get_content(h1, until_h1):
 
 def get_metadata(soup: BeautifulSoup):
     mete_h1 = soup.find("h1")
-    title_cn = rbk(mete_h1.text)  # TODO
-    title_en = rbk(mete_h1.find_next_sibling("h2").text)  # TODO
+
     data_table = mete_h1.find_next_sibling("table").find("tbody")
     data_lines = data_table.find_all("tr")
     data_pairs = [list(map(lambda x: rbk(x.text), i.find_all("td")))
                   for i in data_lines]
-    data_dict = dict(data_pairs)  # TODO
-    return "tmp"  # TODO
+    data_dict = dict(data_pairs)
+
+    meta = Metadata()
+    meta.title_zh_CN = rbk(mete_h1.text)
+    meta.title_en = rbk(mete_h1.find_next_sibling("h2").text)
+    meta.school = data_dict["学院（系）"]
+    meta.major = data_dict["专业"]
+    meta.name = data_dict["学生姓名"]
+    meta.number = data_dict["学号"]
+    meta.teacher = data_dict["指导教师"]
+    meta.auditor = data_dict["评阅教师"]
+    meta.finish_date = data_dict["完成日期"]
+
+    return meta
 
 
 def get_abs(soup: BeautifulSoup):
@@ -124,25 +142,34 @@ def get_abs(soup: BeautifulSoup):
     abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
     ps_key = get_ps(abs_cn_h1)
     assert_warning(ps_key[-1] == "关键词：", '摘要应该以"关键词："后接关键词列表结尾')
-    ps = ps_key[:-1]  # TODO
-    keywords = [rbk(i.text)
-                for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]  # TODO
+    ps_cn = ps_key[:-1]
+    keywords_cn = [rbk(i.text)
+                   for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]
 
     # Abstract
     abs_h1 = soup.find("h1", string=re.compile("Abstract"))
     ps_key = get_ps(abs_h1)
     assert_warning(ps_key[-1] == "Key Words:",
                    'Abstract应该以"Key Words:"后接关键词列表结尾')
-    ps = ps_key[:-1]  # TODO
-    keywords = [rbk(i.text)
-                for i in abs_h1.find_next_sibling("ul").find_all("li")]  # TODO
-    return "tmp"  # TODO
+    ps_en = ps_key[:-1]
+    keywords_en = [rbk(i.text)
+                   for i in abs_h1.find_next_sibling("ul").find_all("li")]
+
+    abs = Abstract()
+    abs.set_text(assemble(ps_cn), assemble(ps_en))
+    abs.set_keyword(keywords_cn, keywords_en)
+
+    return abs
 
 
 def get_intro(soup: BeautifulSoup):
     intro_h1 = soup.find("h1", string=re.compile("引言"))
     ps = get_ps(intro_h1)  # TODO
-    return "tmp"  # TODO
+
+    intro = Introduction()
+    intro.set_text(assemble(ps))
+
+    return intro
 
 
 def get_body(soup: BeautifulSoup):
@@ -155,8 +182,12 @@ def get_body(soup: BeautifulSoup):
 
 def get_conclusion(soup: BeautifulSoup):
     conclusion_h1 = soup.find("h1", string=re.compile("结论"))
-    ps = get_ps(conclusion_h1)  # TODO
-    return "tmp"  # TODO
+    ps = get_ps(conclusion_h1)
+
+    conclusion = Conclusion()
+    conclusion.set_text(assemble(ps))
+
+    return conclusion
 
 
 def get_reference(soup: BeautifulSoup):
@@ -186,8 +217,11 @@ def get_record(soup: BeautifulSoup):
 
 def get_thanks(soup: BeautifulSoup):
     thanks_h1 = soup.find("h1", string=re.compile("致谢"))
-    ps = get_ps(thanks_h1)  # TODO
-    return "tmp"  # TODO
+    ps = get_ps(thanks_h1)
+
+    ack = Acknowledgments()
+    ack.set_text(assemble(ps))
+    return ack
 
 
 # 处理文章
