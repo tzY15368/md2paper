@@ -23,6 +23,35 @@ def log_error(s: str):
     return assert_error(False, s)
 
 
+main_h_level = [0]
+
+
+def process_headline(h_label: str, headline: str):
+    global main_h_level
+    level = int(h_label[1:])
+    assert_warning(1 <= level and level <= len(main_h_level)+1,
+                   "标题层级应该递进")
+    if level == len(main_h_level) + 1:  # new sub section
+        main_h_level.append(1)
+    elif 1 <= level and level <= len(main_h_level):  # new section
+        main_h_level[level-1] += 1
+        main_h_level = main_h_level[:level]
+    else:
+        log_error("错误的标题编号")
+
+    index = str(main_h_level[0])
+    for i in range(1, len(main_h_level)):
+        index += "." + str(main_h_level[i])
+
+    headline = headline.strip()
+    assert_warning(headline[:len(index)] == index, "没有编号或者编号错误")
+    assert_warning(headline[len(index):len(index)+2] == "  " and
+                   headline[len(index)+2] != " ",
+                   "编号后应该有两个空格: " + headline)
+    headline = headline[:len(index)+2] + rbk(headline[len(index)+2:])
+
+    return (h_label, headline)
+
 # 处理文本
 
 
@@ -63,12 +92,16 @@ def get_content(h1, until_h1):
     conts = []
     cur = h1.next_sibling
     while cur != until_h1:
-        if cur.name == "table":
-            conts.append(("table", "something"))  # FIXME
-        elif cur.name != None:
-            conts.append((cur.name, rbk(cur.text)))
+        if cur.name != None:
+            if cur.name == "table":
+                conts.append(("table", "something"))  # FIXME
+            elif cur.name[0] == "h":  # h1 h2 ...
+                headline_pair = process_headline(cur.name, cur.text)
+                conts.append(headline_pair)
+            else:
+                conts.append((cur.name, rbk(cur.text)))
         cur = cur.next_sibling
-    print(conts[0])
+    print("content: " + str(conts[0]))
     return conts
 
 
