@@ -244,9 +244,8 @@ class MainContent(Component): # 正文
 
     def __init__(self) -> None:
         super().__init__()
-        self.__internal_text = Block()
         self.__last_blk:Block = None
-
+        
     def get_last_block(self)->Block:
         if not self.__last_blk:
             raise ValueError("last blk is not yet set")
@@ -257,7 +256,7 @@ class MainContent(Component): # 正文
         new_chapter = Block()
         self.__last_blk = new_chapter
         new_chapter.set_title(title,Block.heading_1)
-        return self.__internal_text.add_sub_block(new_chapter)
+        return self.get_internal_text().add_sub_block(new_chapter)
     
     # add_section returns the added section
     def add_section(self, chapter:Block, title:str)->Block:
@@ -280,12 +279,19 @@ class MainContent(Component): # 正文
         self.get_last_block().add_content(Text(text))
 
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
-    def render_template(self, offset:int) -> int:
+    def render_template(self) -> int:
+        anchor_text = "1  正文格式说明"
+        anchor_style = "Heading 1"
         incr_next = 3
         incr_kw = "结    论（设计类为设计总结"
-        while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text:
-            DM.delete_paragraph_by_index(offset)
-        return self.__internal_text.render_template(offset)
+        #此处没有覆盖原有内容，因此还需要删去原有的大标题 1 正文格式……
+        offset = super().render_template(anchor_text,incr_next,incr_kw,anchor_style_name=anchor_style)
+        
+        line_delete_count = 1
+        pos = DM.get_anchor_position(anchor_text,anchor_style_name=anchor_style) - 1
+        for i in range(line_delete_count):
+            DM.delete_paragraph_by_index(pos)
+        return offset - line_delete_count
 
 class Introduction(Component): #引言 由于正文定位依赖引言，如果没写引言，依旧会生成引言，最后删掉
     def render_template(self) -> int:
@@ -383,8 +389,8 @@ class Block(): #content
         self.__sub_blocks.append(block)
         return block
 
-    def add_content(self,content:Union[Text,Image,Formula]=None,
-            content_list:Union[List[Text],List[Image],List[Formula]]=[]) -> Block:
+    def add_content(self,content:Union[Text,Image,Formula,Table]=None,
+            content_list:Union[List[Text],List[Image],List[Formula],List[Table]]=[]) -> Block:
         if content:
             self.__content_list.append(content)
         for i in content_list:
@@ -410,7 +416,8 @@ class Block(): #content
             p_title = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
             p_title.style = DM.get_doc().styles['Heading '+str(self.__level)]
             p_title.add_run()
-            p_title.runs[0].text= str(self.__id) if self.__id else "" +"  "+self.__title
+            title_idx = "" if not self.__id else str(self.__id) + "  "
+            p_title.runs[0].text= title_idx + self.__title
             new_offset = new_offset + 1
         
         new_offset = self.render_block(new_offset)
@@ -512,7 +519,7 @@ But if you know for sure none of those are present, these few lines should get t
 现在就称其为好奇心。我感谢警告，但我仍然感到好奇。
 一个用例是，如果您要使用Django库公开的Form类，但不包含其字段之一。在Django中，表单字段是由某些类属性定义的。例如，请参阅此SO问题。"""
     intro.set_text(t)
-    main_start = intro.render_template()
+    intro.render_template()
 
     mc = MainContent()
     c1 = mc.add_chapter("第一章 刘姥姥")
@@ -528,7 +535,7 @@ But if you know for sure none of those are present, these few lines should get t
     mc.set_text(ss1,h)
     c3 = mc.add_chapter("第三章 大观园")
     mc.set_text(c3,t)
-    mc.render_template(offset=main_start)
+    mc.render_template()
 
     conc = Conclusion()
     e = """如果代码中出现太多的条件判断语句的话，代码就会变得难以维护和阅读。 这里的解决方案是将每个状态抽取出来定义成一个类。
@@ -562,7 +569,7 @@ But if you know for sure none of those are present, these few lines should get t
     apd.add_appendix("附录B","直接来吧")
     apd.render_template()
 
-    DM.update_toc()
+    #DM.update_toc()
     doc.save("out.docx")
 
     
