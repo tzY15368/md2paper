@@ -410,7 +410,8 @@ class Block(): #content
             p_title = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
             p_title.style = DM.get_doc().styles['Heading '+str(self.__level)]
             p_title.add_run()
-            p_title.runs[0].text= str(self.__id) if self.__id else "" +"  "+self.__title
+            title_idx = "" if not self.__id else str(self.__id) + "  "
+            p_title.runs[0].text= title_idx + self.__title
             new_offset = new_offset + 1
         
         new_offset = self.render_block(new_offset)
