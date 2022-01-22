@@ -383,8 +383,8 @@ class Block(): #content
         self.__sub_blocks.append(block)
         return block
 
-    def add_content(self,content:Union[Text,Image,Formula]=None,
-            content_list:Union[List[Text],List[Image],List[Formula]]=[]) -> Block:
+    def add_content(self,content:Union[Text,Image,Formula,Table]=None,
+            content_list:Union[List[Text],List[Image],List[Formula],List[Table]]=[]) -> Block:
         if content:
             self.__content_list.append(content)
         for i in content_list:
