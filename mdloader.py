@@ -55,8 +55,8 @@ def process_headline(h_label: str, headline: str):
 
     return (h_label, headline)
 
-# 处理文本
 
+# 处理文本
 
 def rbk(text: str):  # remove_blank
     # 删除换行符
@@ -108,7 +108,6 @@ def get_content(h1, until_h1):
             else:
                 conts.append((cur.name, rbk(cur.text)))
         cur = cur.next_sibling
-    print("content: " + str(conts[0]))
     return conts
 
 
@@ -176,8 +175,21 @@ def get_body(soup: BeautifulSoup):
     body_h1 = soup.find("h1", string=re.compile("正文"))
     content = get_content(body_h1,
                           soup.find("h1", string=re.compile("结论")))
-    print(body_h1)  # FIXME
-    return "tmp"  # TODO
+
+    mc = MainContent()
+    for (name, text) in content:
+        if name == "h1":
+            chapter = mc.add_chapter(text)
+        elif name == "h2":
+            section = mc.add_section(chapter, text)
+        elif name == "h3":
+            subsection = mc.add_subsection(section, text)
+        elif name == "p":
+            mc.append_paragraph(text)
+        else:
+            print("还没实现now", name)
+
+    return mc
 
 
 def get_conclusion(soup: BeautifulSoup):
@@ -268,4 +280,19 @@ def load_md(file_name: str, file_type: str):
 
 
 if __name__ == "__main__":
-    md = load_md("论文模板.md", "论文")
+    doc = docx.Document("毕业设计（论文）模板-docx.docx")
+    DM.set_doc(doc)
+
+    paper = load_md("论文模板.md", "论文")
+    paper[0].render_template()  # metadata
+    paper[1].render_template()  # 摘要 Abstract
+    main_start = paper[2].render_template()  # 引言
+    paper[3].render_template(main_start)  # 正文
+    paper[4].render_template()  # 结论
+    # paper[5].render_template()  # 参考文献
+    # paper[6].render_template()  # 附录
+    # paper[7].render_template()  # 修改记录
+    paper[8].render_template()  # 致谢
+
+    DM.update_toc()
+    doc.save("out.docx")
