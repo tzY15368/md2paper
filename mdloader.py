@@ -341,8 +341,8 @@ if __name__ == "__main__":
     paper = load_md("论文模板.md", "论文")
     paper[0].render_template()  # metadata
     paper[1].render_template()  # 摘要 Abstract
-    main_start = paper[2].render_template()  # 引言
-    paper[3].render_template(main_start)  # 正文
+    paper[2].render_template()  # 引言
+    paper[3].render_template()  # 正文
     paper[4].render_template()  # 结论
     # paper[5].render_template()  # 参考文献
     # paper[6].render_template()  # 附录
