@@ -1,11 +1,10 @@
 from __future__ import annotations
-from ast import Pass
 from typing import Union,List
 import docx
 from docx.shared import Inches
 
 class DocNotSetException(Exception):
-    Pass
+    pass
 class DocManager():
     __doc_target = None
 
