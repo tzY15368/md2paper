@@ -26,6 +26,35 @@ def log_error(s: str):
     return assert_error(False, s)
 
 
+# 处理文本
+
+def rbk(text: str):  # remove_blank
+    # 删除换行符
+    text = text.replace("\n", "")
+    text = text.replace("\r", "")
+
+    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’]'
+    # 中文字符后空格
+    should_replace_list = re.compile(
+        cn_char + u' +').findall(text)
+    # 中文字符前空格
+    should_replace_list += re.compile(
+        u' +' + cn_char).findall(text)
+    # 删除空格
+    for i in should_replace_list:
+        if i == u' ':
+            continue
+        new_i = i.strip()
+        text = text.replace(i, new_i)
+    return text
+
+
+def assemble(texts: list[str]):
+    return reduce(lambda x, y: x+"\n"+y, texts)
+
+
+# 处理标签
+
 main_h_level = [0]
 
 
@@ -56,31 +85,31 @@ def process_headline(h_label: str, headline: str):
     return (h_label, headline)
 
 
-# 处理文本
+def process_table(table):
+    data = []
+    data.append([rbk(i.text) for i in table.find("thead").find_all("th")])
+    for tr in table.find("tbody").find_all("tr"):
+        data.append([rbk(i.text) for i in tr.find_all("td")])
+    return data
 
-def rbk(text: str):  # remove_blank
-    # 删除换行符
-    text = text.replace("\n", "")
-    text = text.replace("\r", "")
 
-    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’]'
-    # 中文字符后空格
-    should_replace_list = re.compile(
-        cn_char + u' +').findall(text)
-    # 中文字符前空格
-    should_replace_list += re.compile(
-        u' +' + cn_char).findall(text)
-    # 删除空格
-    for i in should_replace_list:
-        if i == u' ':
+def process_il(il):
+    data = []
+    for i in il.children:
+        if i.name == None:
+            data.append(("p", rbk(i.text)))
+        elif i.name == "br":
             continue
-        new_i = i.strip()
-        text = text.replace(i, new_i)
-    return text
+        elif i.name == "ol":
+            data.append(("ol", process_ol(i)))
+        else:
+            log_error("缺了什么？" + i.prettify())
+    return {"item": data[0][1], "data": data[1:]}
 
 
-def assemble(texts: list[str]):
-    return reduce(lambda x, y: x+"\n"+y, texts)
+def process_ol(ol):
+    data = [("il", process_il(i)) for i in ol.find_all("li", recursive=False)]
+    return data
 
 
 # 提取内容
@@ -100,15 +129,50 @@ def get_content(h1, until_h1):
     cur = h1.next_sibling
     while cur != until_h1:
         if cur.name != None:
-            if cur.name == "table":
-                conts.append(("table", "something"))  # FIXME
-            elif cur.name[0] == "h":  # h1 h2 ...
+            if cur.name[0] == "h":  # h1 h2 ...
                 headline_pair = process_headline(cur.name, cur.text)
                 conts.append(headline_pair)
+            elif cur.name == "p":
+                imgs = cur.find_all("img")
+                if imgs == []:
+                    conts.append(("p", rbk(cur.text)))
+                else:
+                    assert_warning(cur.text == "",
+                                   "文字和图片需要分段" + cur.prettify())
+                    for img in imgs:
+                        conts.append(("img",
+                                      {"alt": img["alt"], "src": img["src"]}))
+            elif cur.name == "table":
+                table_name = conts[-1]
+                conts = conts[:-1]
+                conts.append(("table",
+                              {"table_name": table_name[1], "data": process_table(cur)}))
+            elif cur.name == "ol":
+                conts.append(("ol", process_ol(cur)))
             else:
-                conts.append((cur.name, rbk(cur.text)))
+                log_error("这是啥？" + cur.prettify())
         cur = cur.next_sibling
     return conts
+
+
+def set_content(cont_block, content):
+    for (name, cont) in content:
+        if name == "h1":
+            chapter = cont_block.add_chapter(cont)
+        elif name == "h2":
+            section = cont_block.add_section(chapter, cont)
+        elif name == "h3":
+            subsection = cont_block.add_subsection(section, cont)
+        elif name == "p":
+            cont_block.append_paragraph(cont)
+        elif name == "img":
+            print("还没实现now", name)
+        elif name == "table":
+            print("还没实现now", name)
+        elif name == "ol":
+            print("还没实现now", name)
+        else:
+            print("还没实现now", name)
 
 
 # 获得每个论文模块
@@ -177,17 +241,7 @@ def get_body(soup: BeautifulSoup):
                           soup.find("h1", string=re.compile("结论")))
 
     mc = MainContent()
-    for (name, text) in content:
-        if name == "h1":
-            chapter = mc.add_chapter(text)
-        elif name == "h2":
-            section = mc.add_section(chapter, text)
-        elif name == "h3":
-            subsection = mc.add_subsection(section, text)
-        elif name == "p":
-            mc.append_paragraph(text)
-        else:
-            print("还没实现now", name)
+    set_content(mc, content)
 
     return mc
 
@@ -266,6 +320,7 @@ def load_md(file_name: str, file_type: str):
     with open(file_name, "r") as f:
         md_file = f.read()
     md_html = markdown.markdown(md_file,
+                                tab_length=3,
                                 extensions=['markdown.extensions.tables'])
     soup = BeautifulSoup(md_html, 'html.parser')
     for i in soup(text=lambda text: isinstance(text, Comment)):
