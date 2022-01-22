@@ -34,7 +34,7 @@ class DocManager():
         p._p = p._element = None    
 
     @classmethod
-    def get_anchor_position(cls,anchor_text:str)->int:
+    def get_anchor_position(cls,anchor_text:str,anchor_style_name="")->int:
         # FIXME: 需要优化
         # 目前被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
         # USE-WITH-CARE
@@ -42,8 +42,10 @@ class DocManager():
         i = -1
         for _i,paragraph in enumerate(cls.get_doc().paragraphs):
             if anchor_text in paragraph.text:
-                i = _i
-                break
+                if (not anchor_style_name) or (paragraph.style.name == anchor_style_name):
+                    i = _i
+                    break
+                        
         if i==-1: raise ValueError(f"anchor `{anchor_text}` not found") 
         return i + 1
 
@@ -66,8 +68,8 @@ class Component(BaseComponent):
     # incr_next: 用于在插入新内容后往后删老模板当前段内容，
     # 直到删除到incr_kw往前incr_next个paragraph
     # incr_kw：见上面incr_next
-    def render_template(self, anchor_text:str,  incr_next:int, incr_kw)->int:
-        offset = DM.get_anchor_position(anchor_text=anchor_text)
+    def render_template(self, anchor_text:str,  incr_next:int, incr_kw, anchor_style_name="")->int:
+        offset = DM.get_anchor_position(anchor_text=anchor_text,anchor_style_name=anchor_style_name)
         while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text\
                  and (offset+incr_next)!=(len(DM.get_doc().paragraphs)-1):
             DM.delete_paragraph_by_index(offset)
@@ -254,9 +256,10 @@ class ChangeRecord(Component): #修改记录
         # fixme: this anchor doesn't work, need to traverse backwards.
         # add API in render_template?
         ANCHOR = "修改记录"
-        incr_next = 3
+        ANCHOR_STYLE = "Heading 1"
+        incr_next = 0
         incr_kw = "致    谢"
-        return super().render_template(ANCHOR,incr_next,incr_kw)
+        return super().render_template(ANCHOR,incr_next,incr_kw,anchor_style_name=ANCHOR_STYLE)
 
 class Acknowledgments(Component): #致谢
     def render_template(self) -> int:
@@ -303,7 +306,7 @@ class Block(BaseComponent): #content
         new_offset = offset
         if self.__title:
             p_title = DM.get_doc().paragraphs[offset].insert_paragraph_before()
-            p_title.style = doc.styles['Heading 1']
+            p_title.style = DM.get_doc().styles['Heading 1']
             p_title.add_run()
             p_title.runs[0].text= str(self.__id) if self.__id else "" +"  "+self.__title
             new_offset = new_offset + 1
@@ -426,8 +429,7 @@ But if you know for sure none of those are present, these few lines should get t
     g = """在无线传能技术中，非辐射无线传能（即电磁感应充电）可以高效传输能量，但有效传输距离被限制在收发器尺寸的几倍之内；而辐射无线传能（如无线电、激光）虽然可以远距离传输能量，但需要复杂的控制机制来跟踪移动的能量接收器。
 近日，同济大学电子与信息工程学院的研究团队通过理论和实验证明，"""
     cha.set_text(g)
-    # this doesn't work, bad anchor
-    #cha.render_template()
+    cha.render_template()
 
     doc.save("out.docx")
 
