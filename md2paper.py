@@ -2,45 +2,58 @@ from __future__ import annotations
 from typing import Union,List
 import docx
 from docx.shared import Inches
-        
-class BaseComponent():
-    doc_target: docx.Document
+from docx.enum.text import WD_BREAK
+class DocNotSetException(Exception):
+    pass
+class DocManager():
+    __doc_target = None
 
-    def __init__(self,doc_target:docx.Document) -> None:
-        self.doc_target = doc_target
+    @classmethod
+    def set_doc(cls,doc_target:docx.Document):
+        cls.__doc_target = doc_target
+        cls.__clear_tables()
 
+    @classmethod
+    def get_doc(cls)->docx.Document:
+        if not cls.__doc_target:
+            raise DocNotSetException("doc target is not set, call DM.set_doc")
+        return cls.__doc_target
+
+    @classmethod
+    def __clear_tables(cls):
         # delete all tables on startup as we don't need them
-        for i in range(len(self.doc_target.tables)):
-            t = doc.tables[0]._element
+        for i in range(len(cls.get_doc().tables)):
+            t = cls.get_doc().tables[0]._element
             t.getparent().remove(t)
             t._t = t._element = None
 
-
-    def delete_paragraph_by_index(self, index):
-        p = self.doc_target.paragraphs[index]._element
+    @classmethod
+    def delete_paragraph_by_index(cls, index):
+        p = cls.get_doc().paragraphs[index]._element
         p.getparent().remove(p)
-        p._p = p._element = None
+        p._p = p._element = None    
 
-    def render_template(self):
-        raise NotImplementedError
-
-    def get_anchor_position(self,anchor_text:str)->int:
+    @classmethod
+    def get_anchor_position(cls,anchor_text:str,anchor_style_name="")->int:
         # FIXME: 需要优化
         # 目前被设计成无状态的，只依赖template.docx文件以便测试，增加了性能开销
         # USE-WITH-CARE
         # 只靠标题的anchor-text找paragraph很容易找错，用的时候注意
         i = -1
-        for _i,paragraph in enumerate(self.doc_target.paragraphs):
+        for _i,paragraph in enumerate(cls.get_doc().paragraphs):
             if anchor_text in paragraph.text:
-                i = _i
-                break
+                if (not anchor_style_name) or (paragraph.style.name == anchor_style_name):
+                    i = _i
+                    break
+                        
         if i==-1: raise ValueError(f"anchor `{anchor_text}` not found") 
         return i + 1
-        
-class Component(BaseComponent):
-    def __init__(self, doc_target: docx.Document) -> None:
-        super().__init__(doc_target)
-        self.__internal_text = Block(doc_target)
+
+DM = DocManager
+
+class Component():
+    def __init__(self) -> None:
+        self.__internal_text = Block()
     
     def set_text(self, text:str):
         self.__internal_text.add_content(content_list=Text.read(text))
@@ -49,13 +62,13 @@ class Component(BaseComponent):
     # incr_next: 用于在插入新内容后往后删老模板当前段内容，
     # 直到删除到incr_kw往前incr_next个paragraph
     # incr_kw：见上面incr_next
-    def render_template(self, anchor_text:str,  incr_next:int, incr_kw)->int:
-        offset = self.get_anchor_position(anchor_text=anchor_text)
-        while not incr_kw in self.doc_target.paragraphs[offset+incr_next].text\
-                 and (offset+incr_next)!=(len(self.doc_target.paragraphs)-1):
-            self.delete_paragraph_by_index(offset)
+    def render_template(self, anchor_text:str,  incr_next:int, incr_kw, anchor_style_name="")->int:
+        offset = DM.get_anchor_position(anchor_text=anchor_text,anchor_style_name=anchor_style_name)
+        while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text\
+                 and (offset+incr_next)!=(len(DM.get_doc().paragraphs)-1):
+            DM.delete_paragraph_by_index(offset)
             #print('deleted 1 line for anchor',anchor_text)
-        return self.__internal_text.render_block(offset)
+        return self.__internal_text.render_template(offset)
 
 class BaseContent():
     def to_paragraph():
@@ -74,6 +87,7 @@ class Text(BaseContent):
     @classmethod
     def read(cls, txt:str)->List[Text]:
         return [Text(i) for i in txt.split('\n')]
+
 class Image(BaseContent):
     img_url = ""
     img_alt = ""
@@ -124,8 +138,8 @@ class Metadata(Component):
             'zh_CN': 4,
             'en': 5,
         }
-        self.doc_target.paragraphs[title_mapping['zh_CN']].runs[0].text = self.title_zh_CN
-        self.doc_target.paragraphs[title_mapping['en']].runs[0].text = self.title_en
+        DM.get_doc().paragraphs[title_mapping['zh_CN']].runs[0].text = self.title_zh_CN
+        DM.get_doc().paragraphs[title_mapping['en']].runs[0].text = self.title_en
 
         line_mapping = {
             15: self.school,
@@ -140,8 +154,8 @@ class Metadata(Component):
         for line_no in line_mapping:
             if line_mapping[line_no] == None:
                 continue
-            print(len(self.doc_target.paragraphs[line_no].runs[-1].text))
-            self.doc_target.paragraphs[line_no].runs[-1].text = self.__fill_blank(BLANK_LENGTH,line_mapping[line_no])
+            print(len(DM.get_doc().paragraphs[line_no].runs[-1].text))
+            DM.get_doc().paragraphs[line_no].runs[-1].text = self.__fill_blank(BLANK_LENGTH,line_mapping[line_no])
 
 class Abstract(Component):   
     __keyword_zh_CN: Text = None
@@ -149,10 +163,9 @@ class Abstract(Component):
     __text_zh_CN: Block = None
     __text_en: Block = None
 
-    def __init__(self, doc_target: docx.Document) -> None:
-        super().__init__(doc_target)
-        self.__text_en = Block(doc_target)
-        self.__text_zh_CN = Block(doc_target)
+    def __init__(self) -> None:
+        self.__text_en = Block()
+        self.__text_zh_CN = Block()
 
     def set_keyword(self, zh_CN:List[str],en:List[str]):
         SEPARATOR = "；"
@@ -172,39 +185,39 @@ class Abstract(Component):
         # https://stackoverflow.com/questions/30584681/how-to-properly-indent-with-python-docx
         #p.paragraph_format.first_line_indent = Inches(0.25)
         
-        while not self.doc_target.paragraphs[abs_cn_end+2].text.startswith("关键词："):
-            self.delete_paragraph_by_index(abs_cn_end+1)
+        while not DM.get_doc().paragraphs[abs_cn_end+2].text.startswith("关键词："):
+            DM.delete_paragraph_by_index(abs_cn_end+1)
         
         # cn kw
         kw_cn_start = abs_cn_end + 2
-        self.doc_target.paragraphs[kw_cn_start].runs[1].text = self.__keyword_zh_CN.to_paragraph()
+        DM.get_doc().paragraphs[kw_cn_start].runs[1].text = self.__keyword_zh_CN.to_paragraph()
         
         # en start
 
         en_title_start = kw_cn_start+4
-        self.doc_target.paragraphs[en_title_start].runs[1].text = en_title
+        DM.get_doc().paragraphs[en_title_start].runs[1].text = en_title
 
         en_abs_start = en_title_start + 3
         en_abs_end = self.__text_en.render_block(en_abs_start)-1
         #self.doc_target.paragraphs[en_abs_start].insert_paragraph_before(text=self.__text_en.to_paragraph())
 
         # https://stackoverflow.com/questions/61335992/how-can-i-use-python-to-delete-certain-paragraphs-in-docx-document
-        while not self.doc_target.paragraphs[en_abs_end+2].text.startswith("Key Words："):
-            self.delete_paragraph_by_index(en_abs_end+1)
+        while not DM.get_doc().paragraphs[en_abs_end+2].text.startswith("Key Words："):
+            DM.delete_paragraph_by_index(en_abs_end+1)
 
         # en kw
         kw_en_start = en_abs_end +2
 
         # https://github.com/python-openxml/python-docx/issues/740
-        delete_num = len(self.doc_target.paragraphs[kw_en_start].runs) - 4
-        for run in reversed(list(self.doc_target.paragraphs[kw_en_start].runs)):
-            self.doc_target.paragraphs[kw_en_start]._p.remove(run._r)
+        delete_num = len(DM.get_doc().paragraphs[kw_en_start].runs) - 4
+        for run in reversed(list(DM.get_doc().paragraphs[kw_en_start].runs)):
+            DM.get_doc().paragraphs[kw_en_start]._p.remove(run._r)
             delete_num -= 1
             if delete_num < 1:
                 break
         
         
-        self.doc_target.paragraphs[kw_en_start].runs[3].text = self.__keyword_en.to_paragraph()
+        DM.get_doc().paragraphs[kw_en_start].runs[3].text = self.__keyword_en.to_paragraph()
         return kw_en_start+1
 class Conclusion(Component):
     def render_template(self) -> int:
@@ -214,22 +227,63 @@ class Conclusion(Component):
         return super().render_template(ANCHOR, incr_next, incr_kw)
 
 class MainContent(Component): # 正文
-    pass
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.__internal_text = Block()
+
+    # add_chapter returns the added chapter
+    def add_chapter(self,title:str)->Block:
+        new_chapter = Block()
+        new_chapter.set_title(title,Block.heading_1)
+        return self.__internal_text.add_sub_block(new_chapter)
+    
+    # add_section returns the added section
+    def add_section(self, chapter:Block, title:str)->Block:
+        new_section = Block()
+        new_section.set_title(title,Block.heading_2)
+        return chapter.add_sub_block(new_section)
+
+    # add_subsection returns the added subsection
+    def add_subsection(self, section:Block, title:str)->Block:
+        new_subsection = Block()
+        new_subsection.set_title(title,Block.heading_3)
+        return section.add_sub_block(new_subsection)
+
+    def set_text(self, location:Block, text:str):
+        location.add_content(content_list=Text.read(text))
+
+    # 由于无法定位正文，需要先生成引言，再用引言返回的offset
+    def render_template(self, offset:int) -> int:
+        incr_next = 3
+        incr_kw = "结    论（设计类为设计总结"
+        while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text:
+            DM.delete_paragraph_by_index(offset)
+        return self.__internal_text.render_template(offset)
+
+class Introduction(Component): #引言 由于正文定位依赖引言，如果没写引言，依旧会生成引言，最后删掉
+    def render_template(self) -> int:
+        anchor_text = "引    言"
+        incr_next = 3
+        incr_kw = "正文格式说明"
+        anchor_style_name = "Heading 1"
+        return super().render_template(anchor_text, incr_next, incr_kw, anchor_style_name=anchor_style_name)
+
 
 class References(Component): #参考文献
     def render_template(self) -> int:
         ANCHOR = "参 考 文 献"
         incr_next = 1
         incr_kw = "附录A"
-        offset_start = self.get_anchor_position(ANCHOR)
+        offset_start = DM.get_anchor_position(ANCHOR)
         offset_end = super().render_template(ANCHOR, incr_next, incr_kw) -incr_next+1
-        _style = self.doc_target.styles['参考文献正文']
+        _style = DM.get_doc().styles['参考文献正文']
         for i in range(offset_start,offset_end):
-            self.doc_target.paragraphs[i].style = _style
-
+            DM.get_doc().paragraphs[i].style = _style
+        return offset_end
         
 
-class Appendixes(Component): #附录abcdefg
+class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
     pass
 
 class ChangeRecord(Component): #修改记录
@@ -237,9 +291,10 @@ class ChangeRecord(Component): #修改记录
         # fixme: this anchor doesn't work, need to traverse backwards.
         # add API in render_template?
         ANCHOR = "修改记录"
-        incr_next = 3
+        ANCHOR_STYLE = "Heading 1"
+        incr_next = 0
         incr_kw = "致    谢"
-        return super().render_template(ANCHOR,incr_next,incr_kw)
+        return super().render_template(ANCHOR,incr_next,incr_kw,anchor_style_name=ANCHOR_STYLE)
 
 class Acknowledgments(Component): #致谢
     def render_template(self) -> int:
@@ -251,11 +306,14 @@ class Acknowledgments(Component): #致谢
         return super().render_template(ANCHOR,incr_next,incr_kw)
     
 
-class Block(BaseComponent): #content
+class Block(): #content
     # 每个block是多个image，formula，text的组合，内部有序
-    
-    def __init__(self, doc_target: docx.Document) -> None:
-        super().__init__(doc_target)
+    heading_1 = 1
+    heading_2 = 2
+    heading_3 = 3
+    heading_4 = 4
+
+    def __init__(self) -> None:
         self.__title:str = None
         self.__content_list:List[Union[Text,Image,Formula]] = []
         self.__sub_blocks:List[Block] = []
@@ -264,12 +322,17 @@ class Block(BaseComponent): #content
     def set_id(self, id:int):
         self.__id = id
 
-    def set_title(self,title:str) -> None:
+    # 由level决定标题的样式（heading1，2，3）
+    def set_title(self,title:str,level:int) -> None:
         self.__title = title
+        if level not in range(0,5):
+            raise ValueError("invalid heading level")
+        self.__level = level
+        #print('set title',self.__title)
     
     def add_sub_block(self,block:Block)->Block:
         self.__sub_blocks.append(block)
-        return self
+        return block
 
     def add_content(self,content:Union[Text,Image,Formula]=None,
             content_list:Union[List[Text],List[Image],List[Formula]]=[]) -> Block:
@@ -285,15 +348,25 @@ class Block(BaseComponent): #content
     # 顺序：先title，再自己的content-list，再自己的sub-block
     def render_template(self, offset:int)->int:
         new_offset = offset
+
+        # 如果是一级，给头上（标题前面）增加分页符
+        if self.__title and self.__level == self.heading_1:
+            p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            run = p.add_run()
+            run.add_break(WD_BREAK.PAGE)
+            new_offset = new_offset + 1
+
         if self.__title:
-            p_title = self.doc_target.paragraphs[offset].insert_paragraph_before()
-            p_title.style = doc.styles['Heading 1']
+            #print('title:',self.__title,'level:',self.__level)
+            p_title = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            p_title.style = DM.get_doc().styles['Heading '+str(self.__level)]
             p_title.add_run()
             p_title.runs[0].text= str(self.__id) if self.__id else "" +"  "+self.__title
             new_offset = new_offset + 1
-
+        
         new_offset = self.render_block(new_offset)
 
+        #print('has',len(self.__sub_blocks),"sub-blocks")
         for i,block in enumerate(self.__sub_blocks):
             new_offset = block.render_template(new_offset) 
 
@@ -309,7 +382,7 @@ class Block(BaseComponent): #content
             return offset
         # generate necessary paragraphs
         internal_content_list = []
-        p = self.doc_target.paragraphs[offset].insert_paragraph_before()
+        p = DM.get_doc().paragraphs[offset].insert_paragraph_before()
         internal_content_list.insert(0,p)
         for i in range(len(self.__content_list)-1):
             p = internal_content_list[0].insert_paragraph_before()
@@ -318,10 +391,9 @@ class Block(BaseComponent): #content
         #print('got content list',len(internal_content_list),id(self))
         assert len(self.__content_list)==len(internal_content_list)
         for i in range(len(self.__content_list)):
-            #p = self.doc_target.paragraphs[offset].insert_paragraph_before()
             if type(self.__content_list[i]) == Text:
                 p = internal_content_list[i]
-                p.style = self.doc_target.styles['Normal']
+                p.style = DM.get_doc().styles['Normal']
                 p.text = self.__content_list[i].to_paragraph()
                 p.paragraph_format.first_line_indent = Inches(0.25)
             else:
@@ -353,7 +425,9 @@ class MD2Paper():
         pass
 
 if __name__ == "__main__":
+    
     doc = docx.Document("毕业设计（论文）模板-docx.docx")
+    DM.set_doc(doc)
     # meta = Metadata(doc_target=doc)
     # meta.school = "电子信息与电气工程"
     # meta.number = "201800000"
@@ -365,7 +439,7 @@ if __name__ == "__main__":
     # meta.title_zh_CN = "这是个怎样的世界"
     # meta.render_template()
 
-    abs = Abstract(doc)
+    abs = Abstract()
     a = """CommonMark中并未定义普通文本高亮。
 CSDN中支持通过==文本高亮==，实现文本高亮
 
@@ -384,7 +458,30 @@ But if you know for sure none of those are present, these few lines should get t
     abs.set_keyword(b,d)
     abs.render_template()
 
-    conc = Conclusion(doc)
+    intro = Introduction()
+    t = """这样做违反了Liskov替代原则。换句话说，这是一个可怕的想法，B不应该是A的子类型。我只是感兴趣：您为什么要这样做？@delnan出于某种原因每当有人提到我总是想到Who Doctor的Blinovitch限制效应时。
+现在就称其为好奇心。我感谢警告，但我仍然感到好奇。
+一个用例是，如果您要使用Django库公开的Form类，但不包含其字段之一。在Django中，表单字段是由某些类属性定义的。例如，请参阅此SO问题。"""
+    intro.set_text(t)
+    main_start = intro.render_template()
+
+    mc = MainContent()
+    c1 = mc.add_chapter("第一章 刘姥姥")
+    s1 = mc.add_section(c1, "1.1 asdfasdf")
+    s2 = mc.add_section(c1, "1.2 bbbb")
+    h = """目前的娛樂型電腦螢幕市場，依照玩家的需求大致可以分為兩大勢力：一派是主打對戰類型
+    的電競玩家、另一派則主打追劇的多媒體影音玩家。前者需要需要高更新率的螢幕，在分秒必爭的對戰中搶得先機；後者則需要較高的解析度以及HDR的顯示內容，好用來欣賞畫面的每一個細節。"""
+    mc.set_text(c1,h)
+    mc.set_text(s2,h)
+    c2 = mc.add_chapter("第二章 菜花")
+    s3 = mc.add_section(c2,"2.1 aaa")
+    ss1 = mc.add_subsection(s3,"2.1.1 asdf")
+    mc.set_text(ss1,h)
+    c3 = mc.add_chapter("第三章 大观园")
+    mc.set_text(c3,t)
+    mc.render_template(offset=main_start)
+
+    conc = Conclusion()
     e = """如果代码中出现太多的条件判断语句的话，代码就会变得难以维护和阅读。 这里的解决方案是将每个状态抽取出来定义成一个类。
 这里看上去有点奇怪，每个状态对象都只有静态方法，并没有存储任何的实例属性数据。 实际上，所有状态信息都只存储在 Connection 实例中。 
 在基类中定义的 NotImplementedError 是为了确保子类实现了相应的方法。 这里你或许还想使用8.12小节讲解的抽象基类方式。
@@ -393,23 +490,24 @@ But if you know for sure none of those are present, these few lines should get t
     conc.set_text(e)
     conc.render_template()
 
-    ref = References(doc)
+    ref = References()
     h = """[1] 国家标准局信息分类编码研究所.GB/T 2659-1986 世界各国和地区名称代码[S]//全国文献工作标准化技术委员会.文献工作国家标准汇编:3.北京:中国标准出版社,1988:59-92. 
 [2] 韩吉人.论职工教育的特点[G]//中国职工教育研究会.职工教育研究论文集.北京:人民教育出版社,1985:90-99. """
     ref.set_text(h)
     ref.render_template()
 
-    ack = Acknowledgments(doc)
+    ack = Acknowledgments()
     f = """肾衰竭（Kidney failure）是一种终末期的肾脏疾病，此时肾脏的功能会低于其正常水平的15%。由于透析会严重影响患者的生活质量，肾移植一直是治疗肾衰竭的理想方式。但肾脏供体一直处于短缺状态，移植需等待时间约为5-10年。近日，据一篇发表于《美国移植杂志》的文章，阿拉巴马大学伯明翰分校的科学家首次成功将基因编辑猪的肾脏成功移植给一名脑死亡的人类接受者。
 研究使用的供体猪的10个关键基因经过了基因编辑，其肾脏的功能更适合人体，且植入人体后引发的免疫排斥反应更轻微。研究人员首先对异种供体和接受者进行交叉配型测试。经配对后，研究人员将肾脏移植入脑死亡接受者的肾脏对应的解剖位置，与肾动脉、肾静脉和输尿管相连接。移植后，他们为患者进行了常规的免疫抑制治疗。目前，肾脏已在患者体内正常工作77小时。该研究按照1期临床试验标准进行，完全按人类供体器官的移植标准实施。研究显示，异种移植的发展在未来或可缓解世界范围器官供应压力。"""
     ack.set_text(f)
     ack.render_template()
 
-    cha = ChangeRecord(doc)
+    cha = ChangeRecord()
     g = """在无线传能技术中，非辐射无线传能（即电磁感应充电）可以高效传输能量，但有效传输距离被限制在收发器尺寸的几倍之内；而辐射无线传能（如无线电、激光）虽然可以远距离传输能量，但需要复杂的控制机制来跟踪移动的能量接收器。
 近日，同济大学电子与信息工程学院的研究团队通过理论和实验证明，"""
     cha.set_text(g)
-    # this doesn't work, bad anchor
-    #cha.render_template()
+    cha.render_template()
 
     doc.save("out.docx")
+
+    
