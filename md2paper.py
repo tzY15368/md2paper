@@ -245,27 +245,39 @@ class MainContent(Component): # 正文
     def __init__(self) -> None:
         super().__init__()
         self.__internal_text = Block()
+        self.__last_blk:Block = None
+
+    def get_last_block(self)->Block:
+        if not self.__last_blk:
+            raise ValueError("last blk is not yet set")
+        return self.__last_blk
 
     # add_chapter returns the added chapter
     def add_chapter(self,title:str)->Block:
         new_chapter = Block()
+        self.__last_blk = new_chapter
         new_chapter.set_title(title,Block.heading_1)
         return self.__internal_text.add_sub_block(new_chapter)
     
     # add_section returns the added section
     def add_section(self, chapter:Block, title:str)->Block:
         new_section = Block()
+        self.__last_blk = new_section
         new_section.set_title(title,Block.heading_2)
         return chapter.add_sub_block(new_section)
 
     # add_subsection returns the added subsection
     def add_subsection(self, section:Block, title:str)->Block:
         new_subsection = Block()
+        self.__last_blk = new_subsection
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
 
     def set_text(self, location:Block, text:str):
         location.add_content(content_list=Text.read(text))
+
+    def append_paragraph(self, text:str):
+        self.get_last_block().add_content(Text(text))
 
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
     def render_template(self, offset:int) -> int:
