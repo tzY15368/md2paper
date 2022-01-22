@@ -25,8 +25,26 @@ def log_error(s: str):
 
 # 处理文本
 
-def rbk(s: str):  # remove_blank
-    return s
+
+def rbk(text: str):  # remove_blank
+    # 删除换行符
+    text = text.replace("\n", "")
+    text = text.replace("\r", "")
+
+    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’]'
+    # 中文字符后空格
+    should_replace_list = re.compile(
+        cn_char + u' +').findall(text)
+    # 中文字符前空格
+    should_replace_list += re.compile(
+        u' +' + cn_char).findall(text)
+    # 删除空格
+    for i in should_replace_list:
+        if i == u' ':
+            continue
+        new_i = i.strip()
+        text = text.replace(i, new_i)
+    return text
 
 
 # 提取内容
