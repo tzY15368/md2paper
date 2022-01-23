@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Union,List
 import docx
 from docx.shared import Inches,Cm
-from docx.enum.text import WD_BREAK
+from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
 import lxml
 class DocNotSetException(Exception):
     pass
@@ -129,11 +129,38 @@ class Text(BaseContent):
     def read(cls, txt:str)->List[Text]:
         return [Text(i) for i in txt.split('\n')]
 
-class Image(BaseContent):
+class ImageData():
     def __init__(self,src:str,alt:str) -> None:
+        self.img_src = src
+        self.img_alt = alt
+
+class Image(BaseContent):
+    def __init__(self,data:List[ImageData]) -> None:
         super().__init__()
-        self.img_src = ""
-        self.img_alt = ""
+        self.__images = data
+
+    def render_paragraph(self, offset: int) -> int:
+        new_offset = offset
+        for img in self.__images:
+            p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+            p.style = DM.get_doc().styles['图名中文']
+            # 先换一行
+            r0 = p.add_run()
+            r0.add_break(WD_BREAK.LINE)
+            r = p.add_run()
+            r.add_picture(img.img_src,width=Inches(4.0), height=Inches(4.7))
+            r2 = p.add_run()
+            r2.add_break(WD_BREAK.LINE)
+            r3 = p.add_run()
+            r3.add_text("\n"+img.img_alt)
+            # 结尾再换
+            r4 = p.add_run()
+            r4.add_break(WD_BREAK.LINE)
+
+            new_offset = new_offset + 1
+        
+        return new_offset
 
 class Formula(BaseContent):
     pass
@@ -294,11 +321,11 @@ class MainContent(Component): # 正文
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
 
-    def add_text(self, location:Block, text:str):
+    def add_text(self, location:Block, text:str): # 公式inline解析
         location.add_content(content_list=Text.read(text))
     
-    def add_content(self, location:Block, content:List[Union[Text,Image,Formula,Table]]):
-        location.add_content(content_list=content)
+    def add_image(self, location:Block, images:List[ImageData]):
+        location.add_content(Image(images))
 
     def append_paragraph(self, text:str):
         self.get_last_block().add_content(Text(text))
@@ -544,6 +571,10 @@ But if you know for sure none of those are present, these few lines should get t
     s3 = mc.add_section(c2,"2.1 aaa")
     ss1 = mc.add_subsection(s3,"2.1.1 asdf")
     mc.add_text(ss1,h)
+    mc.add_image(ss1,[
+        ImageData("classes.png","图1：these are the classes"),
+        ImageData("classes.png","图2:asldkfja;sldkf")
+    ])
     c3 = mc.add_chapter("第三章 大观园")
     mc.add_text(c3,t)
     mc.render_template()
