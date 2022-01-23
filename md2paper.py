@@ -3,6 +3,7 @@ from typing import Union,List
 import docx
 from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ALIGN_VERTICAL
 import lxml
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -216,6 +217,7 @@ class Table(BaseContent):
         for i,row in enumerate(self.__table):
             for j,cell_str in enumerate(row.row):
                 cell = table.rows[i].cells[j]
+                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 Table.set_cell_border(
                     cell,
                     top={"val":'single','color':white if not row.has_top_border else black},
@@ -223,10 +225,19 @@ class Table(BaseContent):
                     start={"color":white},
                     end={"color":white}
                 )
-                p = cell.paragraphs[0]
-                p.text = cell_str
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p.style = DM.get_doc().styles['图名中文']
+                if cell_str == None:
+                    if i == 0:
+                        raise ValueError("invalid empty field in row 0")
+                    else:
+                        # 上一行同一列的cell
+                        other_cell = table.rows[i-1].cells[j]
+                        cell.merge(other_cell)
+                        other_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                else:
+                    p = cell.paragraphs[0]
+                    p.text = cell_str
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p.style = DM.get_doc().styles['图名中文']
 
         return new_offset
 
@@ -686,7 +697,7 @@ But if you know for sure none of those are present, these few lines should get t
     data = [
         Row(['第一章','第二章','第三章'],top_border=True),
         Row(['刘姥姥初试钢铁侠','刘姥姥初试大不净者','刘姥姥倒拔绿巨人'],top_border=True),
-        Row(['刘姥姥初试惊奇队长','刘姥姥巧试无限宝石','刘姥姥菜花染诸神']),
+        Row(['刘姥姥初试惊奇队长',None,'刘姥姥菜花染诸神']),
         Row(['菜花反噬！','天地乖离菜花之星','重启刘姥姥菜花宇宙'],top_border=True)
     ]
     mc.add_table(c3,"表1 刘姥姥背叛斯大林",data)
