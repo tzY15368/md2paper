@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import Union,List
+from typing import Union,List,Dict
 import docx
 from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
 import lxml
+from collections import OrderedDict
 class DocNotSetException(Exception):
     pass
 class DocManager():
@@ -165,8 +166,50 @@ class Image(BaseContent):
 class Formula(BaseContent):
     pass
 
+class Row():
+    def __init__(self,data:List[str],top_border:bool=False) -> None:
+        self.row:List[str] = data
+        self.has_top_border = top_border
+
 class Table(BaseContent):
-    pass
+    # table的最后一行默认有下边框，剩下依靠row的top-border自行决定
+    def __init__(self,title:str, table:List[Row]) -> None:
+        super().__init__()
+        self.__title = title
+        self.__table:List[Row] = table
+        if len(table) < 1:
+            raise ValueError("invalid table content")
+        self.__cols = len(self.__table[0].row)
+        self.__rows = len(self.__table)
+    
+    def render_paragraph(self, offset: int) -> int:
+        new_offset = offset
+        p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+        p1.style = DM.get_doc().styles['图名中文']
+        # 先换一行
+        r0 = p1.add_run()
+        r0.add_break(WD_BREAK.LINE)
+        
+        r1 = p1.add_run()
+        r1.add_text(self.__title)
+        new_offset = new_offset + 1
+
+        p2 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        # 表格自带一个换行？
+        table = DM.get_doc().add_table(rows = self.__rows, cols = self.__cols, style='Table Grid')
+        # 将table挪到paragrpah里
+        p2._p.addnext(table._tbl)
+        # 挪完删掉paragraph
+        DM.delete_paragraph_by_index(new_offset)
+        
+        new_offset = new_offset + 1
+        
+        # 结尾再换
+        p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        new_offset = new_offset + 1
+
+        return new_offset
 
 class Metadata(Component):
     school: str = None
@@ -326,6 +369,9 @@ class MainContent(Component): # 正文
     
     def add_image(self, location:Block, images:List[ImageData]):
         location.add_content(Image(images))
+
+    def add_table(self, location:Block, title:str, table:List[Union[None,List[str]]]):
+        location.add_content(Table(title,table))
 
     def append_paragraph(self, text:str):
         self.get_last_block().add_content(Text(text))
@@ -577,6 +623,14 @@ But if you know for sure none of those are present, these few lines should get t
     ])
     c3 = mc.add_chapter("第三章 大观园")
     mc.add_text(c3,t)
+    data = [
+        Row(['第一章','第二章','第三章'],top_border=True),
+        Row(['刘姥姥初试钢铁侠','刘姥姥初试大不净者','刘姥姥倒拔绿巨人'],top_border=True),
+        Row(['刘姥姥初试惊奇队长','刘姥姥巧试无限宝石','刘姥姥菜花染诸神']),
+        Row(['菜花反噬！','天地乖离菜花之星','重启刘姥姥菜花宇宙'],top_border=True)
+    ]
+    mc.add_table(c3,"表1 刘姥姥背叛斯大林",data)
+    mc.add_text(c3,"wtf is this?")
     mc.render_template()
 
     conc = Conclusion()
