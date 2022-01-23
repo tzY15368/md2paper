@@ -7,6 +7,20 @@ from docx.enum.table import WD_ALIGN_VERTICAL
 import lxml
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from lxml import etree
+import latex2mathml.converter
+
+
+def latex_to_word(latex_input):
+    mathml = latex2mathml.converter.convert(latex_input)
+    tree = etree.fromstring(mathml)
+    xslt = etree.parse(
+        'mml2omml.xsl'
+        )
+    transform = etree.XSLT(xslt)
+    new_dom = transform(tree)
+    return new_dom.getroot()
+
 class DocNotSetException(Exception):
     pass
 class DocManager():
@@ -97,15 +111,21 @@ class Run():
     normal = 1
     italics = 2
     bold = 4
+    formula = 8
     def __init__(self,text:str,style:int=0) -> None:
         self.text = text
         self.bold = style & self.bold != 0
         self.italics = style & self.italics != 0
+        self.formula = style & self.formula != 0
     
     def render_run(self,run):
-        run.text = self.text
-        run.bold = self.bold
-        run.italic = self.italics
+        if not self.formula:
+            run.text = self.text
+            run.bold = self.bold
+            run.italic = self.italics
+        else:
+            word_math = latex_to_word(self.text)
+            run._element.append(word_math)
 
 class Text(BaseContent):
     # 换行会被该类内部自动处理
@@ -114,7 +134,9 @@ class Text(BaseContent):
         self.__raw_text = raw_text
         self.__runs:List[Run] = []
         # 处理粗体，斜体，公式
+
         self.__runs.append(Run(raw_text,Run.normal))
+        self.__runs.append(Run(r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",Run.formula))
 
     def to_paragraph(self)->str:
         return self.__raw_text
@@ -164,9 +186,6 @@ class Image(BaseContent):
             new_offset = new_offset + 1
         
         return new_offset
-
-class Formula(BaseContent):
-    pass
 
 class Row():
     def __init__(self,data:List[str],top_border:bool=False) -> None:
