@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import Union,List,Dict
+from typing import Union,List
 import docx
 from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
 import lxml
-from collections import OrderedDict
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 class DocNotSetException(Exception):
     pass
 class DocManager():
@@ -209,7 +210,66 @@ class Table(BaseContent):
         p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         new_offset = new_offset + 1
 
+        # 填充内容, 编辑表格样式
+        black = "#000000"
+        white = "#ffffff"
+        for i,row in enumerate(self.__table):
+            for j,cell_str in enumerate(row.row):
+                cell = table.rows[i].cells[j]
+                Table.set_cell_border(
+                    cell,
+                    top={"val":'single','color':white if not row.has_top_border else black},
+                    bottom = {"val":'single', "color":white if i!=self.__rows-1 else black},
+                    start={"color":white},
+                    end={"color":white}
+                )
+                p = cell.paragraphs[0]
+                p.text = cell_str
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.style = DM.get_doc().styles['图名中文']
+
         return new_offset
+
+    # https://stackoverflow.com/questions/33069697/how-to-setup-cell-borders-with-python-docx
+    @classmethod
+    def set_cell_border(cls, cell, **kwargs):
+        """
+    Set cell`s border
+    Usage:
+
+    set_cell_border(
+        cell,
+        top={"sz": 12, "val": "single", "color": "#FF0000", "space": "0"},
+        bottom={"sz": 12, "color": "#00FF00", "val": "single"},
+        start={"sz": 24, "val": "dashed", "shadow": "true"},
+        end={"sz": 12, "val": "dashed"},
+    )
+        """
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+
+        # check for tag existnace, if none found, then create one
+        tcBorders = tcPr.first_child_found_in("w:tcBorders")
+        if tcBorders is None:
+            tcBorders = OxmlElement('w:tcBorders')
+            tcPr.append(tcBorders)
+
+        # list over all available tags
+        for edge in ('start', 'top', 'end', 'bottom', 'insideH', 'insideV'):
+            edge_data = kwargs.get(edge)
+            if edge_data:
+                tag = 'w:{}'.format(edge)
+
+                # check for tag existnace, if none found, then create one
+                element = tcBorders.find(qn(tag))
+                if element is None:
+                    element = OxmlElement(tag)
+                    tcBorders.append(element)
+
+                # looks like order of attributes is important
+                for key in ["sz", "val", "color", "space", "shadow"]:
+                    if key in edge_data:
+                        element.set(qn('w:{}'.format(key)), str(edge_data[key]))
 
 class Metadata(Component):
     school: str = None
