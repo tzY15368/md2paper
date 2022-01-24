@@ -112,11 +112,12 @@ class Run():
     italics = 2
     bold = 4
     formula = 8
-    def __init__(self,text:str,style:int=0) -> None:
+    def __init__(self,text:str,style:int=0,tabstop:bool=False) -> None:
         self.text = text
         self.bold = style & self.bold != 0
         self.italics = style & self.italics != 0
         self.formula = style & self.formula != 0
+        self.__tabstop = tabstop
     
     def render_run(self,run):
         if not self.formula:
@@ -127,25 +128,43 @@ class Run():
             word_math = latex_to_word(self.text)
             run._element.append(word_math)
 
+    @classmethod
+    def get_tabstop(cls)->Run:
+        return Run("",tabstop=True)
+
+    def is_tabstop(self)->bool:
+        return self.__tabstop
 class Text(BaseContent):
     # 换行会被该类内部自动处理
 
-    def __init__(self, raw_text:str="") -> None:
-        self.__raw_text = raw_text
+    def __init__(self, raw_text:str="",style:int=Run.normal) -> None:
         self.__runs:List[Run] = []
-        # 处理粗体，斜体，公式
+        if raw_text:
+            self.__runs.append(Run(raw_text,style))
 
-        self.__runs.append(Run(raw_text,Run.normal))
-        self.__runs.append(Run(r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",Run.formula))
+    def add_run(self, run:Run)->Text:
+        self.__runs.append(run)
+        return self
 
-    def to_paragraph(self)->str:
-        return self.__raw_text
+    def add_hfill(self)->Text:
+        self.__runs.append(Run.get_tabstop())
+        return self
 
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
         p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         for run in self.__runs:
-            run.render_run(p.add_run())
+            if not run.is_tabstop():
+                run.render_run(p.add_run())
+            else:
+                # https://stackoverflow.com/questions/58656450/how-to-use-tabletop-by-python-docx
+                sec = DM.get_doc().sections[0]
+                margin_end = docx.shared.Inches(
+                    sec.page_width.inches - (sec.left_margin.inches + sec.right_margin.inches))
+                tab_stops = p.paragraph_format.tab_stops
+                # adding new tab stop, to the end point, and making sure that it's `RIGHT` aligned.
+                tab_stops.add_tab_stop(margin_end, docx.enum.text.WD_TAB_ALIGNMENT.RIGHT)
+                
         p.paragraph_format.first_line_indent = Cm(0.82)
         new_offset = new_offset + 1
         return new_offset
@@ -426,36 +445,57 @@ class MainContent(Component): # 正文
 
     def __init__(self) -> None:
         super().__init__()
-        self.__last_blk:Block = None
+        self.__last_subblk:Block = None
         
-    def get_last_block(self)->Block:
-        if not self.__last_blk:
+    def get_last_subblock(self)->Block:
+        if not self.__last_subblk:
             raise ValueError("last blk is not yet set")
-        return self.__last_blk
+        return self.__last_subblk
 
     # add_chapter returns the added chapter
     def add_chapter(self,title:str)->Block:
         new_chapter = Block()
-        self.__last_blk = new_chapter
+        self.__last_subblk = new_chapter
         new_chapter.set_title(title,Block.heading_1)
         return self.get_internal_text().add_sub_block(new_chapter)
     
     # add_section returns the added section
     def add_section(self, chapter:Block, title:str)->Block:
         new_section = Block()
-        self.__last_blk = new_section
+        self.__last_subblk = new_section
         new_section.set_title(title,Block.heading_2)
         return chapter.add_sub_block(new_section)
 
     # add_subsection returns the added subsection
     def add_subsection(self, section:Block, title:str)->Block:
         new_subsection = Block()
-        self.__last_blk = new_subsection
+        self.__last_subblk = new_subsection
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
 
-    def add_text(self, location:Block, text:str): # 公式inline解析
-        location.add_content(content_list=Text.read(text))
+    # 独立的公式, 内联公式应该拿到text之后使用text.add_run
+    def add_formula(self, location:Block, title:str, formula:str)->Text:
+        txt = Text()
+        txt.add_run(Run(formula,Run.formula))
+        txt.add_hfill()
+        txt.add_run(Run("\t"+title,Run.normal))
+        location.add_content(txt)
+        return txt
+
+    def add_text(self, location:Block, text:Union[str,Run])->Text: # 返回最后一块text
+        if type(text)==str:
+            content = Text.read(text)
+            # location对应block内含多个paragraph
+            location.add_content(content_list=content)
+            return content[-1]
+        elif type(text)==Run:
+            txt = Text()
+            txt.add_run(text)
+            location.add_content(txt)
+            return txt
+        else:
+            raise TypeError("expect str/Run")
+
     
     def add_image(self, location:Block, images:List[ImageData]):
         location.add_content(Image(images))
@@ -463,8 +503,10 @@ class MainContent(Component): # 正文
     def add_table(self, location:Block, title:str, table:List[Union[None,List[str]]]):
         location.add_content(Table(title,table))
 
-    def append_paragraph(self, text:str):
-        self.get_last_block().add_content(Text(text))
+    def append_paragraph(self, text:str)->Text:
+        txt = Text(text)
+        self.get_last_subblock().add_content(txt)
+        return txt
 
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
     def render_template(self) -> int:
@@ -558,7 +600,7 @@ class Block(): #content
 
     def __init__(self) -> None:
         self.__title:str = None
-        self.__content_list:List[Union[Text,Image,Formula]] = []
+        self.__content_list:List[Union[Text,Image,Table]] = []
         self.__sub_blocks:List[Block] = []
         self.__id:int = None
 
@@ -577,8 +619,8 @@ class Block(): #content
         self.__sub_blocks.append(block)
         return block
 
-    def add_content(self,content:Union[Text,Image,Formula,Table]=None,
-            content_list:Union[List[Text],List[Image],List[Formula],List[Table]]=[]) -> Block:
+    def add_content(self,content:Union[Text,Image,Table]=None,
+            content_list:Union[List[Text],List[Image],List[Table]]=[]) -> Block:
         if content:
             self.__content_list.append(content)
         for i in content_list:
@@ -706,11 +748,16 @@ But if you know for sure none of those are present, these few lines should get t
     c2 = mc.add_chapter("第二章 菜花")
     s3 = mc.add_section(c2,"2.1 aaa")
     ss1 = mc.add_subsection(s3,"2.1.1 asdf")
-    mc.add_text(ss1,h)
+    txt = mc.add_text(ss1,h)
+    txt.add_run(Run("this should be bold",Run.bold))
+    txt.add_run(Run("italic and bold",Run.italics|Run.bold))
     mc.add_image(ss1,[
         ImageData("classes.png","图1：these are the classes"),
         ImageData("classes.png","图2:asldkfja;sldkf")
     ])
+    mc.add_formula(ss1,"公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN")
+    mc.add_text(ss1,Run("only italics",Run.italics))
+
     c3 = mc.add_chapter("第三章 大观园")
     mc.add_text(c3,t)
     data = [
