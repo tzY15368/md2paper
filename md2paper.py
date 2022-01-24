@@ -1,4 +1,5 @@
 from __future__ import annotations
+from lib2to3.pytree import Base
 from typing import Union,List
 import docx
 from docx.shared import Inches,Cm
@@ -211,8 +212,49 @@ class Row():
         self.row:List[str] = data
         self.has_top_border = top_border
 
+class Formula(BaseContent):
+    def __init__(self,title:str,formula:str) -> None:
+        super().__init__()
+        self.__title:str = title
+        self.__formula:str = formula
+        
+    def render_paragraph(self,offset: int) -> int:
+        new_offset = offset
+        p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        table = DM.get_doc().add_table(rows=1,cols=3)
+        p._p.addnext(table._tbl)
+        DM.delete_paragraph_by_index(new_offset)
+
+        # 公式cell
+        cell_formula = table.rows[0].cells[1]
+        cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        empty = {'color':Table.white}
+        Table.set_cell_border(
+            cell_formula,
+            top=empty,
+            bottom=empty,
+            start=empty,
+            end=empty
+        )
+        _p = cell_formula.paragraphs[0]
+        _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = _p.add_run()
+        Run(self.__formula,Run.formula).render_run(r)
+
+        # 标号cell
+        cell_idx = table.rows[0].cells[2]
+        cell_idx_p = cell_idx.paragraphs[0]
+        cell_idx_p.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        cell_idx_p.text = self.__title
+        cell_idx_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        return new_offset
+
+
 class Table(BaseContent):
     # table的最后一行默认有下边框，剩下依靠row的top-border自行决定
+    black = "#000000"
+    white = "#ffffff"
     def __init__(self,title:str, table:List[Row]) -> None:
         super().__init__()
         self.__title = title
@@ -250,18 +292,16 @@ class Table(BaseContent):
         new_offset = new_offset + 1
 
         # 填充内容, 编辑表格样式
-        black = "#000000"
-        white = "#ffffff"
         for i,row in enumerate(self.__table):
             for j,cell_str in enumerate(row.row):
                 cell = table.rows[i].cells[j]
                 cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 Table.set_cell_border(
                     cell,
-                    top={"val":'single','color':white if not row.has_top_border else black},
-                    bottom = {"val":'single', "color":white if i!=self.__rows-1 else black},
-                    start={"color":white},
-                    end={"color":white}
+                    top={"val":'single','color':self.white if not row.has_top_border else self.black},
+                    bottom = {"val":'single', "color":self.white if i!=self.__rows-1 else self.black},
+                    start={"color":self.white},
+                    end={"color":self.white}
                 )
                 if cell_str == None:
                     if i == 0:
@@ -474,13 +514,10 @@ class MainContent(Component): # 正文
         return section.add_sub_block(new_subsection)
 
     # 独立的公式, 内联公式应该拿到text之后使用text.add_run
-    def add_formula(self, location:Block, title:str, formula:str)->Text:
-        txt = Text()
-        txt.add_run(Run(formula,Run.formula))
-        txt.add_hfill()
-        txt.add_run(Run("\t"+title,Run.normal))
-        location.add_content(txt)
-        return txt
+    def add_formula(self, title:str, formula:str, location:Block=None):
+        if not location:
+            location = self.get_last_subblock()
+        location.add_content(Formula(title,formula))
 
     def add_text(self, location:Block, text:Union[str,Run])->Text: # 返回最后一块text
         if type(text)==str:
@@ -600,7 +637,7 @@ class Block(): #content
 
     def __init__(self) -> None:
         self.__title:str = None
-        self.__content_list:List[Union[Text,Image,Table]] = []
+        self.__content_list:List[Union[Text,Image,Table,Formula]] = []
         self.__sub_blocks:List[Block] = []
         self.__id:int = None
 
@@ -619,8 +656,8 @@ class Block(): #content
         self.__sub_blocks.append(block)
         return block
 
-    def add_content(self,content:Union[Text,Image,Table]=None,
-            content_list:Union[List[Text],List[Image],List[Table]]=[]) -> Block:
+    def add_content(self,content:Union[Text,Image,Table,Formula]=None,
+            content_list:Union[List[Text],List[Image],List[Table],List[Formula]]=[]) -> Block:
         if content:
             self.__content_list.append(content)
         for i in content_list:
@@ -755,7 +792,7 @@ But if you know for sure none of those are present, these few lines should get t
         ImageData("classes.png","图1：these are the classes"),
         ImageData("classes.png","图2:asldkfja;sldkf")
     ])
-    mc.add_formula(ss1,"公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN")
+    mc.add_formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",location=ss1)
     mc.add_text(ss1,Run("only italics",Run.italics))
 
     c3 = mc.add_chapter("第三章 大观园")
