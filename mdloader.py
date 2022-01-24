@@ -87,9 +87,33 @@ def process_headline(h_label: str, headline: str):
 
 def process_table(table):
     data = []
-    data.append([rbk(i.text) for i in table.find("thead").find_all("th")])
+    # 表头，有上实线
+    data.append(Row([rbk(i.text) for i in table.find("thead").find_all("th")],
+                    top_border=True))
+    has_border = True  # 表身第一行有上实线
     for tr in table.find("tbody").find_all("tr"):
-        data.append([rbk(i.text) for i in tr.find_all("td")])
+        row = [rbk(i.text) for i in tr.find_all("td")]
+        row = list(map(lambda x: None if x == '' else x,
+                       row))  # replace '' with None
+        print(row)
+        if has_border:
+            data.append(Row(row, top_border=True))
+            has_border = False
+        else:
+            is_border = True
+            for i in row:
+                if i == None:
+                    is_border = False
+                    break
+                for j in i:
+                    if j != '-':
+                        is_border = False
+                        break
+            if is_border:
+                has_border = True  # 自定义的实线，下一行数据有上实线
+            else:
+                data.append(Row(row))
+
     return data
 
 
@@ -103,6 +127,7 @@ def process_il(il):
         elif i.name == "ol":
             data.append(("ol", process_ol(i)))
         else:
+            continue
             log_error("缺了什么？" + i.prettify())
     return {"item": data[0][1], "data": data[1:]}
 
@@ -168,7 +193,8 @@ def set_content(cont_block, content):
         elif name == "img":
             print("还没实现now", name)
         elif name == "table":
-            print("还没实现now", name)
+            cont_block.add_table(cont_block.get_last_block(),
+                                 cont['table_name'], cont['data'])
         elif name == "ol":
             print("还没实现now", name)
         else:
