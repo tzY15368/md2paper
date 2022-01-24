@@ -2,8 +2,25 @@ from __future__ import annotations
 from typing import Union,List
 import docx
 from docx.shared import Inches,Cm
-from docx.enum.text import WD_BREAK
+from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ALIGN_VERTICAL
 import lxml
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from lxml import etree
+import latex2mathml.converter
+
+
+def latex_to_word(latex_input):
+    mathml = latex2mathml.converter.convert(latex_input)
+    tree = etree.fromstring(mathml)
+    xslt = etree.parse(
+        'mml2omml.xsl'
+        )
+    transform = etree.XSLT(xslt)
+    new_dom = transform(tree)
+    return new_dom.getroot()
+
 class DocNotSetException(Exception):
     pass
 class DocManager():
@@ -69,7 +86,7 @@ class Component():
     def get_internal_text(self)->Block:
         return self.__internal_text
 
-    def set_text(self, text:str):
+    def add_text(self, text:str):
         self.__internal_text.add_content(content_list=Text.read(text))
 
     # anchor_text: 用于找到插入段落位置
@@ -85,32 +102,204 @@ class Component():
         return self.__internal_text.render_template(offset)
 
 class BaseContent():
-    def to_paragraph():
+
+    # 在指定offset 【向上】填充paragraph，返回填充后最后一段的offset+1
+    def render_paragraph(offset:int)->int:
         raise NotImplementedError
+
+class Run():
+    normal = 1
+    italics = 2
+    bold = 4
+    formula = 8
+    def __init__(self,text:str,style:int=0) -> None:
+        self.text = text
+        self.bold = style & self.bold != 0
+        self.italics = style & self.italics != 0
+        self.formula = style & self.formula != 0
+    
+    def render_run(self,run):
+        if not self.formula:
+            run.text = self.text
+            run.bold = self.bold
+            run.italic = self.italics
+        else:
+            word_math = latex_to_word(self.text)
+            run._element.append(word_math)
 
 class Text(BaseContent):
     # 换行会被该类内部自动处理
-    raw_text = ""
 
     def __init__(self, raw_text:str="") -> None:
-        self.raw_text = raw_text
+        self.__raw_text = raw_text
+        self.__runs:List[Run] = []
+        # 处理粗体，斜体，公式
+
+        self.__runs.append(Run(raw_text,Run.normal))
+        self.__runs.append(Run(r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",Run.formula))
 
     def to_paragraph(self)->str:
-        return self.raw_text
+        return self.__raw_text
+
+    def render_paragraph(self, offset: int) -> int:
+        new_offset = offset
+        p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        for run in self.__runs:
+            run.render_run(p.add_run())
+        p.paragraph_format.first_line_indent = Cm(0.82)
+        new_offset = new_offset + 1
+        return new_offset
 
     @classmethod
     def read(cls, txt:str)->List[Text]:
         return [Text(i) for i in txt.split('\n')]
 
-class Image(BaseContent):
-    img_url = ""
-    img_alt = ""
+class ImageData():
+    def __init__(self,src:str,alt:str) -> None:
+        self.img_src = src
+        self.img_alt = alt
 
-class Formula(BaseContent):
-    pass
+class Image(BaseContent):
+    def __init__(self,data:List[ImageData]) -> None:
+        super().__init__()
+        self.__images = data
+
+    def render_paragraph(self, offset: int) -> int:
+        new_offset = offset
+        for img in self.__images:
+            p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+            p.style = DM.get_doc().styles['图名中文']
+            # 先换一行
+            r0 = p.add_run()
+            r0.add_break(WD_BREAK.LINE)
+            r = p.add_run()
+            r.add_picture(img.img_src,width=Inches(4.0), height=Inches(4.7))
+            r2 = p.add_run()
+            r2.add_break(WD_BREAK.LINE)
+            r3 = p.add_run()
+            r3.add_text("\n"+img.img_alt)
+            # 结尾再换
+            r4 = p.add_run()
+            r4.add_break(WD_BREAK.LINE)
+
+            new_offset = new_offset + 1
+        
+        return new_offset
+
+class Row():
+    def __init__(self,data:List[str],top_border:bool=False) -> None:
+        self.row:List[str] = data
+        self.has_top_border = top_border
 
 class Table(BaseContent):
-    pass
+    # table的最后一行默认有下边框，剩下依靠row的top-border自行决定
+    def __init__(self,title:str, table:List[Row]) -> None:
+        super().__init__()
+        self.__title = title
+        self.__table:List[Row] = table
+        if len(table) < 1:
+            raise ValueError("invalid table content")
+        self.__cols = len(self.__table[0].row)
+        self.__rows = len(self.__table)
+    
+    def render_paragraph(self, offset: int) -> int:
+        new_offset = offset
+        p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+        p1.style = DM.get_doc().styles['图名中文']
+        # 先换一行
+        r0 = p1.add_run()
+        r0.add_break(WD_BREAK.LINE)
+        
+        r1 = p1.add_run()
+        r1.add_text(self.__title)
+        new_offset = new_offset + 1
+
+        p2 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        # 表格自带一个换行？
+        table = DM.get_doc().add_table(rows = self.__rows, cols = self.__cols, style='Table Grid')
+        # 将table挪到paragrpah里
+        p2._p.addnext(table._tbl)
+        # 挪完删掉paragraph
+        DM.delete_paragraph_by_index(new_offset)
+        
+        new_offset = new_offset + 1
+        
+        # 结尾再换
+        p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        new_offset = new_offset + 1
+
+        # 填充内容, 编辑表格样式
+        black = "#000000"
+        white = "#ffffff"
+        for i,row in enumerate(self.__table):
+            for j,cell_str in enumerate(row.row):
+                cell = table.rows[i].cells[j]
+                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                Table.set_cell_border(
+                    cell,
+                    top={"val":'single','color':white if not row.has_top_border else black},
+                    bottom = {"val":'single', "color":white if i!=self.__rows-1 else black},
+                    start={"color":white},
+                    end={"color":white}
+                )
+                if cell_str == None:
+                    if i == 0:
+                        raise ValueError("invalid empty field in row 0")
+                    else:
+                        # 上一行同一列的cell
+                        other_cell = table.rows[i-1].cells[j]
+                        cell.merge(other_cell)
+                        other_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                else:
+                    p = cell.paragraphs[0]
+                    p.text = cell_str
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p.style = DM.get_doc().styles['图名中文']
+
+        return new_offset
+
+    # https://stackoverflow.com/questions/33069697/how-to-setup-cell-borders-with-python-docx
+    @classmethod
+    def set_cell_border(cls, cell, **kwargs):
+        """
+    Set cell`s border
+    Usage:
+
+    set_cell_border(
+        cell,
+        top={"sz": 12, "val": "single", "color": "#FF0000", "space": "0"},
+        bottom={"sz": 12, "color": "#00FF00", "val": "single"},
+        start={"sz": 24, "val": "dashed", "shadow": "true"},
+        end={"sz": 12, "val": "dashed"},
+    )
+        """
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+
+        # check for tag existnace, if none found, then create one
+        tcBorders = tcPr.first_child_found_in("w:tcBorders")
+        if tcBorders is None:
+            tcBorders = OxmlElement('w:tcBorders')
+            tcPr.append(tcBorders)
+
+        # list over all available tags
+        for edge in ('start', 'top', 'end', 'bottom', 'insideH', 'insideV'):
+            edge_data = kwargs.get(edge)
+            if edge_data:
+                tag = 'w:{}'.format(edge)
+
+                # check for tag existnace, if none found, then create one
+                element = tcBorders.find(qn(tag))
+                if element is None:
+                    element = OxmlElement(tag)
+                    tcBorders.append(element)
+
+                # looks like order of attributes is important
+                for key in ["sz", "val", "color", "space", "shadow"]:
+                    if key in edge_data:
+                        element.set(qn('w:{}'.format(key)), str(edge_data[key]))
 
 class Metadata(Component):
     school: str = None
@@ -127,7 +316,7 @@ class Metadata(Component):
         """
         填充诸如 "学 生 姓 名：______________"的域
         **一个中文算两个字符
-        fixme!!
+        FIXME: 某些域多出两个空格
         """
         def get_data_len(data:str)->int:
             # 判断是否中文, 一个中文算两个字符
@@ -171,22 +360,20 @@ class Metadata(Component):
             print(len(DM.get_doc().paragraphs[line_no].runs[-1].text))
             DM.get_doc().paragraphs[line_no].runs[-1].text = self.__fill_blank(BLANK_LENGTH,line_mapping[line_no])
 
-class Abstract(Component):   
-    __keyword_zh_CN: Text = None
-    __keyword_en: Text = None
-    __text_zh_CN: Block = None
-    __text_en: Block = None
+class Abstract(Component):
 
     def __init__(self) -> None:
-        self.__text_en = Block()
-        self.__text_zh_CN = Block()
+        self.__text_en:Block = Block()
+        self.__text_zh_CN:Block = Block()
+        self.__keyword_en:str = None
+        self.__keyword_zh_CN:str = None
 
     def set_keyword(self, zh_CN:List[str],en:List[str]):
         SEPARATOR = "；"
-        self.__keyword_en = Text(SEPARATOR.join(en))
-        self.__keyword_zh_CN = Text(SEPARATOR.join(zh_CN))
+        self.__keyword_en = SEPARATOR.join(en)
+        self.__keyword_zh_CN = SEPARATOR.join(zh_CN)
 
-    def set_text(self, zh_CN:str,en:str):
+    def add_text(self, zh_CN:str,en:str):
         self.__text_en.add_content(content_list=Text.read(en))
         self.__text_zh_CN.add_content(content_list=Text.read(zh_CN))
 
@@ -194,17 +381,13 @@ class Abstract(Component):
         # 64开始是摘要正文
         abs_cn_start = 64
         abs_cn_end = self.__text_zh_CN.render_block(abs_cn_start)
-        #p = self.doc_target.paragraphs[ABSTRACT_ZH_CN_START].insert_paragraph_before(text=self.text_zh_CN.to_paragraph())
-        
-        # https://stackoverflow.com/questions/30584681/how-to-properly-indent-with-python-docx
-        #p.paragraph_format.first_line_indent = Inches(0.25)
         
         while not DM.get_doc().paragraphs[abs_cn_end+2].text.startswith("关键词："):
             DM.delete_paragraph_by_index(abs_cn_end+1)
         
         # cn kw
         kw_cn_start = abs_cn_end + 2
-        DM.get_doc().paragraphs[kw_cn_start].runs[1].text = self.__keyword_zh_CN.to_paragraph()
+        DM.get_doc().paragraphs[kw_cn_start].runs[1].text = self.__keyword_zh_CN
         
         # en start
 
@@ -213,7 +396,6 @@ class Abstract(Component):
 
         en_abs_start = en_title_start + 3
         en_abs_end = self.__text_en.render_block(en_abs_start)-1
-        #self.doc_target.paragraphs[en_abs_start].insert_paragraph_before(text=self.__text_en.to_paragraph())
 
         # https://stackoverflow.com/questions/61335992/how-can-i-use-python-to-delete-certain-paragraphs-in-docx-document
         while not DM.get_doc().paragraphs[en_abs_end+2].text.startswith("Key Words："):
@@ -231,7 +413,7 @@ class Abstract(Component):
                 break
         
         
-        DM.get_doc().paragraphs[kw_en_start].runs[3].text = self.__keyword_en.to_paragraph()
+        DM.get_doc().paragraphs[kw_en_start].runs[3].text = self.__keyword_en
         return kw_en_start+1
 class Conclusion(Component):
     def render_template(self) -> int:
@@ -272,8 +454,14 @@ class MainContent(Component): # 正文
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
 
-    def set_text(self, location:Block, text:str):
+    def add_text(self, location:Block, text:str): # 公式inline解析
         location.add_content(content_list=Text.read(text))
+    
+    def add_image(self, location:Block, images:List[ImageData]):
+        location.add_content(Image(images))
+
+    def add_table(self, location:Block, title:str, table:List[Union[None,List[str]]]):
+        location.add_content(Table(title,table))
 
     def append_paragraph(self, text:str):
         self.get_last_block().add_content(Text(text))
@@ -433,28 +621,14 @@ class Block(): #content
     # render_block takes the desired paragraph position's offset,
     # renders the block with native elements: text, image and formulas,
     # and returns the final paragraph's offset
+    
     def render_block(self, offset:int)->int:
         if not self.__content_list:
             return offset
-        # generate necessary paragraphs
-        internal_content_list = []
-        p = DM.get_doc().paragraphs[offset].insert_paragraph_before()
-        internal_content_list.insert(0,p)
-        for i in range(len(self.__content_list)-1):
-            p = internal_content_list[0].insert_paragraph_before()
-            internal_content_list.insert(0,p)
-            
-        #print('got content list',len(internal_content_list),id(self))
-        assert len(self.__content_list)==len(internal_content_list)
-        for i in range(len(self.__content_list)):
-            if type(self.__content_list[i]) == Text:
-                p = internal_content_list[i]
-                p.style = DM.get_doc().styles['Normal']
-                p.text = self.__content_list[i].to_paragraph()
-                p.paragraph_format.first_line_indent = Cm(0.82)#Inches(0.25)
-            else:
-                raise NotImplementedError
-        return offset + len(self.__content_list)
+        new_offset = offset
+        for content in self.__content_list:
+            new_offset = content.render_paragraph(new_offset)
+        return new_offset
 
 class DUTThesisPaper():
     """
@@ -510,7 +684,7 @@ But if you know for sure none of those are present, these few lines should get t
     
     d = ['abc','def','gh']
 
-    abs.set_text(a,c)
+    abs.add_text(a,c)
     abs.set_keyword(b,d)
     abs.render_template()
 
@@ -518,7 +692,7 @@ But if you know for sure none of those are present, these few lines should get t
     t = """这样做违反了Liskov替代原则。换句话说，这是一个可怕的想法，B不应该是A的子类型。我只是感兴趣：您为什么要这样做？@delnan出于某种原因每当有人提到我总是想到Who Doctor的Blinovitch限制效应时。
 现在就称其为好奇心。我感谢警告，但我仍然感到好奇。
 一个用例是，如果您要使用Django库公开的Form类，但不包含其字段之一。在Django中，表单字段是由某些类属性定义的。例如，请参阅此SO问题。"""
-    intro.set_text(t)
+    intro.add_text(t)
     intro.render_template()
 
     mc = MainContent()
@@ -527,14 +701,26 @@ But if you know for sure none of those are present, these few lines should get t
     s2 = mc.add_section(c1, "1.2 bbbb")
     h = """目前的娛樂型電腦螢幕市場，依照玩家的需求大致可以分為兩大勢力：一派是主打對戰類型
     的電競玩家、另一派則主打追劇的多媒體影音玩家。前者需要需要高更新率的螢幕，在分秒必爭的對戰中搶得先機；後者則需要較高的解析度以及HDR的顯示內容，好用來欣賞畫面的每一個細節。"""
-    mc.set_text(c1,h)
-    mc.set_text(s2,h)
+    mc.add_text(c1,h)
+    mc.add_text(s2,h)
     c2 = mc.add_chapter("第二章 菜花")
     s3 = mc.add_section(c2,"2.1 aaa")
     ss1 = mc.add_subsection(s3,"2.1.1 asdf")
-    mc.set_text(ss1,h)
+    mc.add_text(ss1,h)
+    mc.add_image(ss1,[
+        ImageData("classes.png","图1：these are the classes"),
+        ImageData("classes.png","图2:asldkfja;sldkf")
+    ])
     c3 = mc.add_chapter("第三章 大观园")
-    mc.set_text(c3,t)
+    mc.add_text(c3,t)
+    data = [
+        Row(['第一章','第二章','第三章'],top_border=True),
+        Row(['刘姥姥初试钢铁侠','刘姥姥初试大不净者','刘姥姥倒拔绿巨人'],top_border=True),
+        Row(['刘姥姥初试惊奇队长',None,'刘姥姥菜花染诸神']),
+        Row(['菜花反噬！','天地乖离菜花之星','重启刘姥姥菜花宇宙'],top_border=True)
+    ]
+    mc.add_table(c3,"表1 刘姥姥背叛斯大林",data)
+    mc.add_text(c3,"wtf is this?")
     mc.render_template()
 
     conc = Conclusion()
@@ -543,25 +729,25 @@ But if you know for sure none of those are present, these few lines should get t
 在基类中定义的 NotImplementedError 是为了确保子类实现了相应的方法。 这里你或许还想使用8.12小节讲解的抽象基类方式。
 设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
     #conc.set_conclusion(e)
-    conc.set_text(e)
+    conc.add_text(e)
     conc.render_template()
 
     ref = References()
     h = """[1] 国家标准局信息分类编码研究所.GB/T 2659-1986 世界各国和地区名称代码[S]//全国文献工作标准化技术委员会.文献工作国家标准汇编:3.北京:中国标准出版社,1988:59-92. 
 [2] 韩吉人.论职工教育的特点[G]//中国职工教育研究会.职工教育研究论文集.北京:人民教育出版社,1985:90-99. """
-    ref.set_text(h)
+    ref.add_text(h)
     ref.render_template()
 
     ack = Acknowledgments()
     f = """肾衰竭（Kidney failure）是一种终末期的肾脏疾病，此时肾脏的功能会低于其正常水平的15%。由于透析会严重影响患者的生活质量，肾移植一直是治疗肾衰竭的理想方式。但肾脏供体一直处于短缺状态，移植需等待时间约为5-10年。近日，据一篇发表于《美国移植杂志》的文章，阿拉巴马大学伯明翰分校的科学家首次成功将基因编辑猪的肾脏成功移植给一名脑死亡的人类接受者。
 研究使用的供体猪的10个关键基因经过了基因编辑，其肾脏的功能更适合人体，且植入人体后引发的免疫排斥反应更轻微。研究人员首先对异种供体和接受者进行交叉配型测试。经配对后，研究人员将肾脏移植入脑死亡接受者的肾脏对应的解剖位置，与肾动脉、肾静脉和输尿管相连接。移植后，他们为患者进行了常规的免疫抑制治疗。目前，肾脏已在患者体内正常工作77小时。该研究按照1期临床试验标准进行，完全按人类供体器官的移植标准实施。研究显示，异种移植的发展在未来或可缓解世界范围器官供应压力。"""
-    ack.set_text(f)
+    ack.add_text(f)
     ack.render_template()
 
     cha = ChangeRecord()
     g = """在无线传能技术中，非辐射无线传能（即电磁感应充电）可以高效传输能量，但有效传输距离被限制在收发器尺寸的几倍之内；而辐射无线传能（如无线电、激光）虽然可以远距离传输能量，但需要复杂的控制机制来跟踪移动的能量接收器。
 近日，同济大学电子与信息工程学院的研究团队通过理论和实验证明，"""
-    cha.set_text(g)
+    cha.add_text(g)
     cha.render_template()
 
     apd = Appendixes()
