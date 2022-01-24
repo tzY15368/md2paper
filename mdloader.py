@@ -219,7 +219,7 @@ def get_abs(soup: BeautifulSoup):
                    for i in abs_h1.find_next_sibling("ul").find_all("li")]
 
     abs = Abstract()
-    abs.set_text(assemble(ps_cn), assemble(ps_en))
+    abs.add_text(assemble(ps_cn), assemble(ps_en))
     abs.set_keyword(keywords_cn, keywords_en)
 
     return abs
@@ -230,7 +230,7 @@ def get_intro(soup: BeautifulSoup):
     ps = get_ps(intro_h1)  # TODO
 
     intro = Introduction()
-    intro.set_text(assemble(ps))
+    intro.add_text(assemble(ps))
 
     return intro
 
@@ -251,7 +251,7 @@ def get_conclusion(soup: BeautifulSoup):
     ps = get_ps(conclusion_h1)
 
     conclusion = Conclusion()
-    conclusion.set_text(assemble(ps))
+    conclusion.add_text(assemble(ps))
 
     return conclusion
 
@@ -286,7 +286,7 @@ def get_thanks(soup: BeautifulSoup):
     ps = get_ps(thanks_h1)
 
     ack = Acknowledgments()
-    ack.set_text(assemble(ps))
+    ack.add_text(assemble(ps))
     return ack
 
 
