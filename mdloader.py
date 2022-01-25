@@ -341,32 +341,6 @@ def get_index(conts):
 
 # 获得每个论文模块
 
-def get_intro(soup: BeautifulSoup):
-    intro_h1 = soup.find("h1", string=re.compile("引言"))
-    conts = get_content_until(intro_h1.next_sibling,
-                              soup.find("h1", string=re.compile("正文")))
-
-    # TODO
-    # intro sp check
-
-    intro = word.Introduction()
-    intro.add_text(assemble_ps(conts))  # FIXME
-
-    return intro
-
-
-def get_body(soup: BeautifulSoup):
-    body_h1 = soup.find("h1", string=re.compile("正文"))
-    conts = get_content_until(body_h1.next_sibling,
-                              soup.find("h1", string=re.compile("结论")))
-    conts = get_index(conts)
-
-    mc = word.MainContent()
-    set_content(mc, conts)
-
-    return mc
-
-
 def get_conclusion(soup: BeautifulSoup):
     conclusion_h1 = soup.find("h1", string=re.compile("结论"))
     conts = get_content_until(conclusion_h1.next_sibling,
@@ -560,6 +534,18 @@ class AbsPart(PaperPart):
                                self.keywords_en)
 
 
+class IntroPart(PaperPart):
+    def get_contents(self, soup: BeautifulSoup):
+        intro_h1 = soup.find("h1", string=re.compile("引言"))
+        conts = get_content_until(intro_h1.next_sibling,
+                                  soup.find("h1", string=re.compile("正文")))
+        self.contents = conts
+
+    def _set_contents(self):
+        self.block = word.Introduction()
+        self.block.add_text(assemble_ps(self.contents))  # FIXME ?
+
+
 class MainPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         main_h1 = soup.find("h1", string=re.compile("正文"))
@@ -576,13 +562,14 @@ class GraduationPaper(Paper):
     def __init__(self):
         self.meta = MetaPart()
         self.abs = AbsPart()
+        self.intro = IntroPart()
         self.main = MainPart()
 
     def get_contents(self):
         self.meta.get_contents(self.soup)    # metadata
         self.abs.get_contents(self.soup)     # 摘要 Abstract
         # 目录 pass
-        self.intro = get_intro(self.soup)      # 引言
+        self.intro.get_contents(self.soup)   # 引言
         self.main.get_contents(self.soup)      # 正文
         self.conc = get_conclusion(self.soup)  # 结论
         self.ref = get_reference(self.soup)    # 参考文献
@@ -597,9 +584,9 @@ class GraduationPaper(Paper):
         doc = docx.Document(doc_path)
         word.DM.set_doc(doc)
 
-        self.meta.render()  # metadata
-        self.abs.render()   # 摘要 Abstract
-        self.intro.render_template()  # 引言
+        self.meta.render()   # metadata
+        self.abs.render()    # 摘要 Abstract
+        self.intro.render()  # 引言
         self.main.render()  # 正文
         self.conc.render_template()  # 结论
         # self.ref.render_template()  # 参考文献
