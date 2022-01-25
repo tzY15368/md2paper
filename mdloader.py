@@ -422,18 +422,18 @@ class PaperPart:
                     para = self.block.add_text(name)
                 for run in cont:
                     if run["type"] == "text":
-                        para.add_run(word.Run(run["text"], word.Run.normal))
+                        para.add_run(word.Run(run["text"], word.Run.Normal))
                     elif run["type"] == "strong":
-                        para.add_run(word.Run(run["text"], word.Run.bold))
+                        para.add_run(word.Run(run["text"], word.Run.Bold))
                     elif run["type"] == "em":
-                        para.add_run(word.Run(run["text"], word.Run.italics))
+                        para.add_run(word.Run(run["text"], word.Run.Italics))
                     elif run["type"] == "strong-em":
                         para.add_run(word.Run(run["text"],
-                                              word.Run.italics | word.Run.bold))
+                                              word.Run.Italics | word.Run.Bold))
                     elif run["type"] == "math-inline":
-                        para.add_run(word.Run(run["text"], word.Run.formula))
+                        para.add_run(word.Run(run["text"], word.Run.Formula))
                     elif run["type"] == "ref":
-                        para.add_run(word.Run(run["text"], word.Run.normal))
+                        para.add_run(word.Run(run["text"], word.Run.Normal))
                     else:
                         print("还没实现now", name)
             elif name == "img":
