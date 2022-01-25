@@ -7,7 +7,7 @@ import markdown
 import re
 
 
-class BoxBlockProcessor(BlockProcessor):
+class MathBlockProcessor(BlockProcessor):
     RE_FENCE_START = r'^ *\$\$ *'  # start line, e.g., `$$`
     RE_FENCE_END = r' *\$\$$'  # last non-blank line, e.g, '$$'
 
@@ -35,17 +35,20 @@ class BoxBlockProcessor(BlockProcessor):
         return False  # equivalent to our test() routine returning False
 
 
-class MDMathExt(Extension):
+class MDExt(Extension):
     MATH_INLINE_RE = r'(\$)(.*?)\$'
+    REF_RE = r'(\[)(.*?)\]'
 
     def extendMarkdown(self, md):
         # Create the del pattern
         math_inline_tag = SimpleTagPattern(self.MATH_INLINE_RE, 'math-inline')
+        ref_tag = SimpleTagPattern(self.REF_RE, 'ref')
         # Insert del pattern into markdown parser
         md.inlinePatterns.register(math_inline_tag, 'math-inline', 75)
+        md.inlinePatterns.register(ref_tag, 'ref', 75)
 
         md.parser.blockprocessors.register(
-            BoxBlockProcessor(md.parser), 'math', 175)
+            MathBlockProcessor(md.parser), 'math', 175)
 
 
 if __name__ == "__main__":
@@ -62,6 +65,8 @@ $$
 
 inline $a$ formula
 
+[引用]
+
     '''
-    a = markdown.markdown(md, extensions=[MDMathExt()])
+    a = markdown.markdown(md, extensions=[MDExt()])
     print(a)

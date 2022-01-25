@@ -5,7 +5,7 @@ import re
 from functools import reduce
 import os
 
-from mdmathext import MDMathExt
+from mdext import MDExt
 from md2paper import *
 
 file_dir = ""
@@ -66,6 +66,13 @@ def assemble_ps(ps):
     return reduce(lambda x, y: x+"\n"+y, strs)
 
 
+def split_title(title):
+    assert_error(len(title.split(':')) >= 2, "应该有别名或者标题: " + title)
+    ali = title.split(':')[0]
+    title = rbk(title[len(ali)+1:].strip())
+    return ali, title
+
+
 # 处理标签
 
 def process_headline(head_counter: List[int], h_label: str, headline: str):
@@ -113,6 +120,8 @@ def process_ps(p, ollevel=4):
             data.append({"type": "em", "text": rbk(i.text)})
         elif i.name == "math-inline":
             data.append({"type": "math-inline", "text": i.text})
+        elif i.name == "ref":
+            data.append({"type": "ref", "text": rbk(i.text.strip())})
         else:  # 需要分段
             if data:
                 ps.append(("p", data))
@@ -133,7 +142,10 @@ def process_ps(p, ollevel=4):
 def process_img(img):
     global file_dir
     img_path = os.path.join(file_dir, img["src"])
-    return ("img", {"title": img["alt"], "src": img_path})
+    ali, title = split_title(img["alt"])
+    return ("img", {"alias": ali,
+                    "title": title,
+                    "src": img_path})
 
 
 def process_table(title, table):
@@ -164,7 +176,10 @@ def process_table(title, table):
             else:
                 data.append(Row(row))
 
-    return ("table", {"title": title, "data": data})
+    ali, title = split_title(title)
+    return ("table", {"alias": ali,
+                      "title": title,
+                      "data": data})
 
 
 def process_lis(li, level):
@@ -195,7 +210,9 @@ def process_ol(ol, level):
 
 
 def process_math(title, math):
-    return ("math", {"title": title, "text": math.text})
+    return ("math", {"alias": title,
+                     "title": "",
+                     "text": math.text})
 
 
 # 提取内容
@@ -257,6 +274,8 @@ def set_content(cont_block, conts):
                     para.add_run(Run(run["text"], Run.italics | Run.bold))
                 elif run["type"] == "math-inline":
                     para.add_run(Run(run["text"], Run.formula))
+                elif run["type"] == "ref":
+                    para.add_run(Run(run["text"], Run.normal))
                 else:
                     print("还没实现now", name)
         elif name == "img":
@@ -267,6 +286,54 @@ def set_content(cont_block, conts):
             cont_block.add_formula(cont['title'], cont['text'])
         else:
             print("还没实现now", name)
+
+
+# 索引处理
+
+def get_index(conts):
+    index_table = {}
+    text_table = {}
+    chapter_cnt = 0
+
+    for name, cont in conts:
+        if name == "h1":
+            chapter_cnt += 1
+            img_cnt = 0
+            table_cnt = 0
+            formula_cnt = 0
+        elif name in ["img", "table", "math"]:
+            ali = cont['alias']
+            assert_warning(ali not in index_table, "有重复别名" + ali)
+            if name == "img":
+                img_cnt += 1
+                index_table[ali] = "{}.{}".format(chapter_cnt, img_cnt)
+                text_table[ali] = "图{}.{}".format(chapter_cnt, img_cnt)
+                cont['title'] = "图{}  {}".format(
+                    index_table[ali], cont['title'])
+            elif name == "table":
+                table_cnt += 1
+                index_table[ali] = "{}.{}".format(chapter_cnt, table_cnt)
+                text_table[ali] = "表{}.{}".format(chapter_cnt, table_cnt)
+                cont['title'] = "表{}  {}".format(
+                    index_table[ali], cont['title'])
+            elif name == "math":
+                formula_cnt += 1
+                index_table[ali] = "{}.{}".format(chapter_cnt, formula_cnt)
+                text_table[ali] = "式{}.{}".format(chapter_cnt, formula_cnt)
+                cont['title'] = "（{}）".format(index_table[ali])
+
+    for name, cont in conts:
+        if name not in ["p", "fh4", "fh5"]:
+            continue
+        for run in cont:
+            if run["type"] != "ref":
+                continue
+            if run["text"] in text_table:
+                run["text"] = text_table[run["text"]]
+            else:
+                print("未知ref: " + run["text"])
+
+    return conts
 
 
 # 获得每个论文模块
@@ -343,6 +410,7 @@ def get_body(soup: BeautifulSoup):
     body_h1 = soup.find("h1", string=re.compile("正文"))
     conts = get_content_until(body_h1.next_sibling,
                               soup.find("h1", string=re.compile("结论")))
+    conts = get_index(conts)
 
     mc = MainContent()
     set_content(mc, conts)
@@ -439,7 +507,7 @@ def load_md(file_name: str, file_type: str):
     md_html = markdown.markdown(md_file,
                                 tab_length=3,
                                 extensions=['markdown.extensions.tables',
-                                            MDMathExt()])
+                                            MDExt()])
     soup = BeautifulSoup(md_html, 'html.parser')
     for i in soup(text=lambda text: isinstance(text, Comment)):
         i.extract()  # 删除 html 注释
