@@ -561,6 +561,38 @@ class RefPart(PaperPart):
         pass  # FIXME
 
 
+class AppenPart(PaperPart):
+    class AppenOne:
+        def __init__(self, title: str, conts):
+            self.title = title
+            self.contents = conts
+
+    def get_contents(self, soup: BeautifulSoup):
+        appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
+        appendix_h1s.append(soup.find("h1", string=re.compile("修改记录")))
+        appens = []
+        for i in range(0, len(appendix_h1s)-1):
+            conts = get_content_until(appendix_h1s[i].next_sibling,
+                                      appendix_h1s[i+1])
+            title = self._process_title(appendix_h1s[i].text, i)
+            appens.append(self.AppenOne(title, conts))
+        self.appens = appens
+
+    def _set_contents(self):
+        self.block = word.Appendixes()
+        # FIXME
+
+    def _process_title(self, title: str, index: int):
+        assert_warning(title[:2] == "附录", "附录应该以附录和编号开头: " + title)
+        if title[2] == ' ':
+            title = title[:2] + title[3:]
+        assert_warning(title[2] == chr(ord("A") + index),
+                       "附录应该以大写字母顺序编号: " + title)
+        assert_warning(title[3: 5] == "  ", "附录编号和标题间应该有两空格: " + title)
+        title = title[:5] + rbk(title[5:].strip())
+        return title
+
+
 class GraduationPaper(Paper):
     def __init__(self):
         self.meta = MetaPart()
@@ -569,6 +601,7 @@ class GraduationPaper(Paper):
         self.main = MainPart()
         self.conc = ConcPart()
         self.ref = RefPart()
+        self.appen = AppenPart()
 
     def get_contents(self):
         self.meta.get_contents(self.soup)    # metadata
@@ -578,7 +611,7 @@ class GraduationPaper(Paper):
         self.main.get_contents(self.soup)    # 正文
         self.conc.get_contents(self.soup)    # 结论
         self.ref.get_contents(self.soup)    # 参考文献
-        self.appen = get_appendix(self.soup)   # 附录
+        self.appen.get_contents(self.soup)   # 附录
         self.record = get_record(self.soup)    # 修改记录
         self.thanks = get_thanks(self.soup)    # 致谢
 
@@ -595,7 +628,7 @@ class GraduationPaper(Paper):
         self.main.render()  # 正文
         self.conc.render()  # 结论
         self.ref.render()  # 参考文献
-        # self.appen.render_template()  # 附录
+        self.appen.render()  # 附录
         # self.record.render_template()  # 修改记录
         self.thanks.render_template()  # 致谢
 
