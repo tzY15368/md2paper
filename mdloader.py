@@ -547,7 +547,7 @@ class PaperPart:
         self.contents = []
         self.block: word.Component = None
 
-    def __set_body(self):
+    def _set_body(self):
         for (name, cont) in self.contents:
             if name == "h1":
                 self.block.add_chapter(cont)
@@ -586,33 +586,67 @@ class PaperPart:
             else:
                 print("还没实现now", name)
 
-    def __set_contents(self):
-        self.__set_body()
+    def _set_contents(self):
+        self._set_body()
 
     def render(self):
-        self.__set_contents()
+        self._set_contents()
         self.block.render_template()
 
 
-class MainPart(PaperPart):
-    def __init__(self):
-        super().__init__()
-        self.block = word.MainContent()
+class MetaPart(PaperPart):
+    def get_contents(self, soup: BeautifulSoup):
+        mete_h1 = soup.find("h1")
 
+        data_table = mete_h1.find_next_sibling("table").find("tbody")
+        data_lines = data_table.find_all("tr")
+        data_pairs = [list(map(lambda x: rbk(x.text), i.find_all("td")))
+                      for i in data_lines]
+        data_dict = dict(data_pairs)
+
+        self.title_zh_CN = rbk(mete_h1.text)
+        self.title_en = rbk(mete_h1.find_next_sibling("h2").text)
+        self.school = data_dict["学院（系）"]
+        self.major = data_dict["专业"]
+        self.name = data_dict["学生姓名"]
+        self.number = data_dict["学号"]
+        self.teacher = data_dict["指导教师"]
+        self.auditor = data_dict["评阅教师"]
+        self.finish_date = data_dict["完成日期"]
+
+    def _set_contents(self):
+        self.block = word.Metadata()
+
+        self.block.title_zh_CN = self.title_zh_CN
+        self.block.title_en = self.title_en
+        self.block.school = self.school
+        self.block.major = self.major
+        self.block.name = self.name
+        self.block.number = self.number
+        self.block.teacher = self.teacher
+        self.block.auditor = self.auditor
+        self.block.finish_date = self.finish_date
+
+
+class MainPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         main_h1 = soup.find("h1", string=re.compile("正文"))
         conts = get_content_until(main_h1.next_sibling,
                                   soup.find("h1", string=re.compile("结论")))
-
         self.contents = conts
+
+    def _set_contents(self):
+        self.block = word.MainContent()
+        self._set_body()
 
 
 class GraduationPaper(Paper):
     def __init__(self):
+        self.meta = MetaPart()
         self.main = MainPart()
 
     def get_contents(self):
-        self.meta = get_metadata(self.soup)    # metadata
+        self.meta.get_contents(self.soup)    # metadata
         self.abs = get_abs(self.soup)          # 摘要 Abstract
         # 目录 pass
         self.intro = get_intro(self.soup)      # 引言
@@ -626,8 +660,11 @@ class GraduationPaper(Paper):
     def compile(self):
         self.main.contents = get_index(self.main.contents)
 
-    def render(self, doc: Document):
-        self.meta.render_template()  # metadata
+    def render(self, doc_path: str, out_path: str):
+        doc = docx.Document(doc_path)
+        word.DM.set_doc(doc)
+
+        self.meta.render()  # metadata
         self.abs.render_template()   # 摘要 Abstract
         self.intro.render_template()  # 引言
         self.main.render()  # 正文
@@ -637,20 +674,17 @@ class GraduationPaper(Paper):
         # self.record.render_template()  # 修改记录
         self.thanks.render_template()  # 致谢
 
+        word.DM.update_toc()
+        doc.save(out_path)
+
 
 if __name__ == "__main__":
-    doc = docx.Document("毕业设计（论文）模板-docx.docx")
-    word.DM.set_doc(doc)
-
     paper = GraduationPaper()
     paper.load_md("论文模板.md")
     paper.get_contents()
     paper.compile()
 
-    paper.render(doc)
-
-    word.DM.update_toc()
-    doc.save("out.docx")
+    paper.render("毕业设计（论文）模板-docx.docx", "out.docx")
 
 '''
 ("h1", "something")
