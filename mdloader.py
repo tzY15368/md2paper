@@ -522,20 +522,65 @@ def load_md(file_name: str, file_type: str):
         log_error('错误的文件类型，应该选择 "论文" / "外文翻译"')
 
 
+class Paper:
+    def __init__(self):
+        pass
+
+    def load_md(self, md_path: str):
+        with open(md_path, "r") as f:
+            md_file = f.read()
+        md_html = markdown.markdown(md_file,
+                                    tab_length=3,
+                                    extensions=['markdown.extensions.tables',
+                                                MDExt()])
+        self.soup = BeautifulSoup(md_html, 'html.parser')
+        for i in self.soup(text=lambda text: isinstance(text, Comment)):
+            i.extract()  # 删除 html 注释
+
+        if debug:
+            with open("out.html", "w") as f:
+                f.write(self.soup.prettify())
+
+
+class PaperPart:
+    def __init__(self):
+        pass
+
+
+class GraduationPaper(Paper):
+    def encode(self):
+        self.meta = get_metadata(self.soup)    # metadata
+        self.abs = get_abs(self.soup)          # 摘要 Abstract
+        # 目录 pass
+        self.intro = get_intro(self.soup)      # 引言
+        self.main = get_body(self.soup)        # 正文
+        self.conc = get_conclusion(self.soup)  # 结论
+        self.ref = get_reference(self.soup)    # 参考文献
+        self.appen = get_appendix(self.soup)   # 附录
+        self.record = get_record(self.soup)    # 修改记录
+        self.thanks = get_thanks(self.soup)    # 致谢
+
+    def render(self):
+        self.meta.render_template()  # metadata
+        self.abs.render_template()   # 摘要 Abstract
+        self.intro.render_template()  # 引言
+        self.main.render_template()  # 正文
+        self.conc.render_template()  # 结论
+        # self.ref.render_template()  # 参考文献
+        # self.appen.render_template()  # 附录
+        # self.record.render_template()  # 修改记录
+        self.thanks.render_template()  # 致谢
+
+
 if __name__ == "__main__":
     doc = docx.Document("毕业设计（论文）模板-docx.docx")
     DM.set_doc(doc)
 
-    paper = load_md("论文模板.md", "论文")
-    paper[0].render_template()  # metadata
-    paper[1].render_template()  # 摘要 Abstract
-    paper[2].render_template()  # 引言
-    paper[3].render_template()  # 正文
-    paper[4].render_template()  # 结论
-    # paper[5].render_template()  # 参考文献
-    # paper[6].render_template()  # 附录
-    # paper[7].render_template()  # 修改记录
-    paper[8].render_template()  # 致谢
+    paper = GraduationPaper()
+    paper.load_md("论文模板.md")
+    paper.encode()
+
+    paper.render()
 
     DM.update_toc()
     doc.save("out.docx")
