@@ -341,12 +341,6 @@ def get_index(conts):
 
 # 获得每个论文模块
 
-def get_reference(soup: BeautifulSoup):
-    reference_h1 = soup.find("h1", string=re.compile("参考文献"))
-    # 需要一个专门的处理方式
-    print(reference_h1)  # FIXME
-    return "tmp"  # TODO
-
 
 def get_appendix(soup: BeautifulSoup):
     appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
@@ -557,6 +551,16 @@ class ConcPart(PaperPart):
         self.block.add_text(assemble_ps(self.contents))
 
 
+class RefPart(PaperPart):
+    def get_contents(self, soup: BeautifulSoup):
+        reference_h1 = soup.find("h1", string=re.compile("参考文献"))
+        pass  # FIXME
+
+    def _set_contents(self):
+        self.block = word.References()
+        pass  # FIXME
+
+
 class GraduationPaper(Paper):
     def __init__(self):
         self.meta = MetaPart()
@@ -564,6 +568,7 @@ class GraduationPaper(Paper):
         self.intro = IntroPart()
         self.main = MainPart()
         self.conc = ConcPart()
+        self.ref = RefPart()
 
     def get_contents(self):
         self.meta.get_contents(self.soup)    # metadata
@@ -572,7 +577,7 @@ class GraduationPaper(Paper):
         self.intro.get_contents(self.soup)   # 引言
         self.main.get_contents(self.soup)    # 正文
         self.conc.get_contents(self.soup)    # 结论
-        self.ref = get_reference(self.soup)    # 参考文献
+        self.ref.get_contents(self.soup)    # 参考文献
         self.appen = get_appendix(self.soup)   # 附录
         self.record = get_record(self.soup)    # 修改记录
         self.thanks = get_thanks(self.soup)    # 致谢
@@ -589,7 +594,7 @@ class GraduationPaper(Paper):
         self.intro.render()  # 引言
         self.main.render()  # 正文
         self.conc.render()  # 结论
-        # self.ref.render_template()  # 参考文献
+        self.ref.render()  # 参考文献
         # self.appen.render_template()  # 附录
         # self.record.render_template()  # 修改记录
         self.thanks.render_template()  # 致谢
