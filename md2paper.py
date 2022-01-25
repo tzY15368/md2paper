@@ -440,6 +440,13 @@ class Abstract(Component):
         self.__text_zh_CN:Block = Block()
         self.__keyword_en:str = None
         self.__keyword_zh_CN:str = None
+        self.__title_zh_CN = ""
+        self.__title_en = ""
+
+    # 中文title被忽略，因为模板中没用上
+    def set_title(self,zh_CN:str, en:str):
+        self.__title_zh_CN = zh_CN
+        self.__title_en = en
 
     def set_keyword(self, zh_CN:List[str],en:List[str]):
         SEPARATOR = "；"
@@ -450,7 +457,7 @@ class Abstract(Component):
         self.__text_en.add_content(content_list=Text.read(en))
         self.__text_zh_CN.add_content(content_list=Text.read(zh_CN))
 
-    def render_template(self, en_title='this is english title')->int:
+    def render_template(self)->int:
         # 64开始是摘要正文
         abs_cn_start = 64
         abs_cn_end = self.__text_zh_CN.render_block(abs_cn_start)
@@ -465,7 +472,7 @@ class Abstract(Component):
         # en start
 
         en_title_start = kw_cn_start+4
-        DM.get_doc().paragraphs[en_title_start].runs[1].text = en_title
+        DM.get_doc().paragraphs[en_title_start].runs[1].text = self.__title_en
 
         en_abs_start = en_title_start + 3
         en_abs_end = self.__text_en.render_block(en_abs_start)-1
@@ -809,6 +816,7 @@ But if you know for sure none of those are present, these few lines should get t
 
     abs.add_text(a,c)
     abs.set_keyword(b,d)
+    abs.set_title(meta.title_zh_CN,meta.title_en)
     abs.render_template()
 
     intro = Introduction()
