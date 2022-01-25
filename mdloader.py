@@ -49,12 +49,16 @@ def rbk(text: str):  # remove_blank
     return text
 
 
+def raw_text(runs):
+    strs = [i["text"] for i in runs]
+    return reduce(lambda x, y: x+y, strs)
+
+
 def assemble_ps(ps):
-    str_ps = []
+    strs = []
     for (_, runs) in ps:
-        strs = [i["text"] for i in runs]
-        str_ps.append(reduce(lambda x, y: x+y, strs))
-    return reduce(lambda x, y: x+"\n"+y, str_ps)
+        strs.append(raw_text(runs))
+    return reduce(lambda x, y: x+"\n"+y, strs)
 
 
 # 处理标签
@@ -128,7 +132,7 @@ def process_table(title, table):
                     top_border=True))
     has_border = True  # 表身第一行有上实线
     for tr in table.find("tbody").find_all("tr"):
-        row = [rbk(i.text) for i in tr.find_all("td")]
+        row = [rbk(i.text) for i in tr.find_all("td")]  # get all text
         row = list(map(lambda x: None if x == '' else x,
                        row))  # replace '' with None
         if has_border:
@@ -188,9 +192,9 @@ def get_content_until(cur, until, ollevel=4):
         elif cur.name == "p":
             conts += process_ps(cur)
         elif cur.name == "table":
-            table_name = conts[-1]
+            table_name = raw_text(conts[-1][1])
             conts = conts[:-1]
-            conts.append(process_table(table_name[1], cur))
+            conts.append(process_table(table_name, cur))
         elif cur.name == "ol":
             conts += process_ol(cur, ollevel)
         else:
@@ -225,11 +229,9 @@ def set_content(cont_block, conts):
                 else:
                     print("还没实现now", name)
         elif name == "img":
-            print("还没实现now", name)
+            cont_block.add_image([ImageData(cont["src"], cont["title"])])
         elif name == "table":
-            continue  # FIXME
-            cont_block.add_table(cont_block.get_last_block(),
-                                 cont['title'], cont['data'])
+            cont_block.add_table(cont['title'], cont['data'])
         else:
             print("还没实现now", name)
 
@@ -442,9 +444,10 @@ if __name__ == "__main__":
 ("fh4", "something")
 ("fh5", "something")
 
-("p", [("str",    "something"),
-       ("strong", "something"),
-       ("i",      "something")])
+("p", [("text",      "something"),
+       ("strong",    "something"),
+       ("strong-em", "something"),
+       ("em",        "something")])
 ("img",     (title, src))
 ("table",   (title, [Row]))
 ("formula", (title, "somthing"))
