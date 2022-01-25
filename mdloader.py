@@ -341,60 +341,6 @@ def get_index(conts):
 
 # 获得每个论文模块
 
-def get_metadata(soup: BeautifulSoup):
-    mete_h1 = soup.find("h1")
-
-    data_table = mete_h1.find_next_sibling("table").find("tbody")
-    data_lines = data_table.find_all("tr")
-    data_pairs = [list(map(lambda x: rbk(x.text), i.find_all("td")))
-                  for i in data_lines]
-    data_dict = dict(data_pairs)
-
-    meta = word.Metadata()
-    meta.title_zh_CN = rbk(mete_h1.text)
-    meta.title_en = rbk(mete_h1.find_next_sibling("h2").text)
-    meta.school = data_dict["学院（系）"]
-    meta.major = data_dict["专业"]
-    meta.name = data_dict["学生姓名"]
-    meta.number = data_dict["学号"]
-    meta.teacher = data_dict["指导教师"]
-    meta.auditor = data_dict["评阅教师"]
-    meta.finish_date = data_dict["完成日期"]
-
-    return meta
-
-
-def get_abs(soup: BeautifulSoup):
-    # 摘要
-    abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
-    abs_cn_ul = abs_cn_h1.find_next_sibling("ul")
-    conts_cn = get_content_until(abs_cn_h1.next_sibling, abs_cn_ul)
-    assert_warning(conts_cn[-1] == ("p", [{"type": "text", "text": "关键词："}]),
-                   '摘要应该以"关键词："后接关键词列表结尾')
-    conts_cn = conts_cn[:-1]
-    keywords_cn = [rbk(i.text)
-                   for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]
-
-    # Abstract
-    abs_en_h1 = soup.find("h1", string=re.compile("Abstract"))
-    abs_en_ul = abs_en_h1.find_next_sibling("ul")
-    conts_en = get_content_until(abs_en_h1.next_sibling, abs_en_ul)
-    assert_warning(conts_en[-1] == ("p", [{"type": "text", "text": "Key Words:"}]),
-                   'Abstract应该以"Key Words:"后接关键词列表结尾')
-    conts_en = conts_en[:-1]
-    keywords_en = [rbk(i.text)
-                   for i in abs_en_h1.find_next_sibling("ul").find_all("li")]
-
-    # TODO
-    # abs sp check
-
-    abs = word.Abstract()
-    abs.add_text(assemble_ps(conts_cn), assemble_ps(conts_en))
-    abs.set_keyword(keywords_cn, keywords_en)
-
-    return abs
-
-
 def get_intro(soup: BeautifulSoup):
     intro_h1 = soup.find("h1", string=re.compile("引言"))
     conts = get_content_until(intro_h1.next_sibling,
@@ -478,53 +424,6 @@ def get_thanks(soup: BeautifulSoup):
     return ack
 
 
-# 处理文章
-
-def handle_paper(soup: BeautifulSoup):
-    if debug:
-        with open("out.html", "w") as f:
-            f.write(soup.prettify())
-
-    data_ls = [
-        get_metadata(soup),    # metadata
-        get_abs(soup),         # 摘要 Abstract
-                               # 目录 pass
-        get_intro(soup),       # 引言
-        get_body(soup),        # 正文
-        get_conclusion(soup),  # 结论
-        get_reference(soup),   # 参考文献
-        get_appendix(soup),    # 附录
-        get_record(soup),      # 修改记录
-        get_thanks(soup)       # 致谢
-    ]
-    return data_ls
-
-
-def handle_translation(soup: BeautifulSoup):
-    pass
-
-
-def load_md(file_name: str, file_type: str):
-    with open(file_name, "r") as f:
-        md_file = f.read()
-    md_html = markdown.markdown(md_file,
-                                tab_length=3,
-                                extensions=['markdown.extensions.tables',
-                                            MDExt()])
-    soup = BeautifulSoup(md_html, 'html.parser')
-    for i in soup(text=lambda text: isinstance(text, Comment)):
-        i.extract()  # 删除 html 注释
-
-    global file_dir
-    file_dir = os.path.dirname(file_name)
-    if file_type == "论文":
-        return handle_paper(soup)
-    elif file_type == "外文翻译":
-        return handle_translation(soup)
-    else:
-        log_error('错误的文件类型，应该选择 "论文" / "外文翻译"')
-
-
 class Paper:
     def load_md(self, md_path: str):
         with open(md_path, "r") as f:
@@ -589,6 +488,9 @@ class PaperPart:
     def _set_contents(self):
         self._set_body()
 
+    def check(self):
+        pass
+
     def render(self):
         self._set_contents()
         self.block.render_template()
@@ -628,6 +530,36 @@ class MetaPart(PaperPart):
         self.block.finish_date = self.finish_date
 
 
+class AbsPart(PaperPart):
+    def get_contents(self, soup: BeautifulSoup):
+        # 摘要
+        abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
+        abs_cn_ul = abs_cn_h1.find_next_sibling("ul")
+        conts_cn = get_content_until(abs_cn_h1.next_sibling, abs_cn_ul)
+        assert_warning(conts_cn[-1] == ("p", [{"type": "text", "text": "关键词："}]),
+                       '摘要应该以"关键词："后接关键词列表结尾')
+        self.conts_cn = conts_cn[:-1]
+        self.keywords_cn = [rbk(i.text)
+                            for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]
+
+        # Abstract
+        abs_en_h1 = soup.find("h1", string=re.compile("Abstract"))
+        abs_en_ul = abs_en_h1.find_next_sibling("ul")
+        conts_en = get_content_until(abs_en_h1.next_sibling, abs_en_ul)
+        assert_warning(conts_en[-1] == ("p", [{"type": "text", "text": "Key Words:"}]),
+                       'Abstract应该以"Key Words:"后接关键词列表结尾')
+        self.conts_en = conts_en[:-1]
+        self.keywords_en = [rbk(i.text)
+                            for i in abs_en_h1.find_next_sibling("ul").find_all("li")]
+
+    def _set_contents(self):
+        self.block = word.Abstract()
+        self.block.add_text(assemble_ps(self.conts_cn),
+                            assemble_ps(self.conts_en))
+        self.block.set_keyword(self.keywords_cn,
+                               self.keywords_en)
+
+
 class MainPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         main_h1 = soup.find("h1", string=re.compile("正文"))
@@ -643,11 +575,12 @@ class MainPart(PaperPart):
 class GraduationPaper(Paper):
     def __init__(self):
         self.meta = MetaPart()
+        self.abs = AbsPart()
         self.main = MainPart()
 
     def get_contents(self):
         self.meta.get_contents(self.soup)    # metadata
-        self.abs = get_abs(self.soup)          # 摘要 Abstract
+        self.abs.get_contents(self.soup)     # 摘要 Abstract
         # 目录 pass
         self.intro = get_intro(self.soup)      # 引言
         self.main.get_contents(self.soup)      # 正文
@@ -665,7 +598,7 @@ class GraduationPaper(Paper):
         word.DM.set_doc(doc)
 
         self.meta.render()  # metadata
-        self.abs.render_template()   # 摘要 Abstract
+        self.abs.render()   # 摘要 Abstract
         self.intro.render_template()  # 引言
         self.main.render()  # 正文
         self.conc.render_template()  # 结论
