@@ -526,9 +526,6 @@ def load_md(file_name: str, file_type: str):
 
 
 class Paper:
-    def __init__(self):
-        pass
-
     def load_md(self, md_path: str):
         with open(md_path, "r") as f:
             md_file = f.read()
@@ -547,27 +544,93 @@ class Paper:
 
 class PaperPart:
     def __init__(self):
-        pass
+        self.contents = []
+        self.block: word.Component = None
+
+    def __set_body(self):
+        for (name, cont) in self.contents:
+            if name == "h1":
+                self.block.add_chapter(cont)
+            elif name == "h2":
+                self.block.add_section(cont)
+            elif name == "h3":
+                self.block.add_subsection(cont)
+            elif name in ["p", "fh4", "fh5"]:
+                if not debug:
+                    para = self.block.add_text("")
+                else:
+                    para = self.block.add_text(name)
+                for run in cont:
+                    if run["type"] == "text":
+                        para.add_run(word.Run(run["text"], word.Run.normal))
+                    elif run["type"] == "strong":
+                        para.add_run(word.Run(run["text"], word.Run.bold))
+                    elif run["type"] == "em":
+                        para.add_run(word.Run(run["text"], word.Run.italics))
+                    elif run["type"] == "strong-em":
+                        para.add_run(word.Run(run["text"],
+                                              word.Run.italics | word.Run.bold))
+                    elif run["type"] == "math-inline":
+                        para.add_run(word.Run(run["text"], word.Run.formula))
+                    elif run["type"] == "ref":
+                        para.add_run(word.Run(run["text"], word.Run.normal))
+                    else:
+                        print("还没实现now", name)
+            elif name == "img":
+                self.block.add_image(
+                    [word.ImageData(cont["src"], cont["title"])])
+            elif name == "table":
+                self.block.add_table(cont['title'], cont['data'])
+            elif name == "math":
+                self.block.add_formula(cont['title'], cont['text'])
+            else:
+                print("还没实现now", name)
+
+    def __set_contents(self):
+        self.__set_body()
+
+    def render(self):
+        self.__set_contents()
+        self.block.render_template()
+
+
+class MainPart(PaperPart):
+    def __init__(self):
+        super().__init__()
+        self.block = word.MainContent()
+
+    def get_contents(self, soup: BeautifulSoup):
+        main_h1 = soup.find("h1", string=re.compile("正文"))
+        conts = get_content_until(main_h1.next_sibling,
+                                  soup.find("h1", string=re.compile("结论")))
+
+        self.contents = conts
 
 
 class GraduationPaper(Paper):
-    def encode(self):
+    def __init__(self):
+        self.main = MainPart()
+
+    def get_contents(self):
         self.meta = get_metadata(self.soup)    # metadata
         self.abs = get_abs(self.soup)          # 摘要 Abstract
         # 目录 pass
         self.intro = get_intro(self.soup)      # 引言
-        self.main = get_body(self.soup)        # 正文
+        self.main.get_contents(self.soup)      # 正文
         self.conc = get_conclusion(self.soup)  # 结论
         self.ref = get_reference(self.soup)    # 参考文献
         self.appen = get_appendix(self.soup)   # 附录
         self.record = get_record(self.soup)    # 修改记录
         self.thanks = get_thanks(self.soup)    # 致谢
 
+    def compile(self):
+        self.main.contents = get_index(self.main.contents)
+
     def render(self, doc: Document):
         self.meta.render_template()  # metadata
         self.abs.render_template()   # 摘要 Abstract
         self.intro.render_template()  # 引言
-        self.main.render_template()  # 正文
+        self.main.render()  # 正文
         self.conc.render_template()  # 结论
         # self.ref.render_template()  # 参考文献
         # self.appen.render_template()  # 附录
@@ -581,7 +644,8 @@ if __name__ == "__main__":
 
     paper = GraduationPaper()
     paper.load_md("论文模板.md")
-    paper.encode()
+    paper.get_contents()
+    paper.compile()
 
     paper.render(doc)
 
