@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Union,List
+from lib2to3.pytree import Base
+from typing import Dict, Union,List
 import docx
 from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
@@ -112,11 +113,12 @@ class Run():
     italics = 2
     bold = 4
     formula = 8
-    def __init__(self,text:str,style:int=0) -> None:
+    def __init__(self,text:str,style:int=0,tabstop:bool=False) -> None:
         self.text = text
         self.bold = style & self.bold != 0
         self.italics = style & self.italics != 0
         self.formula = style & self.formula != 0
+        self.__tabstop = tabstop
     
     def render_run(self,run):
         if not self.formula:
@@ -127,25 +129,43 @@ class Run():
             word_math = latex_to_word(self.text)
             run._element.append(word_math)
 
+    @classmethod
+    def get_tabstop(cls)->Run:
+        return Run("",tabstop=True)
+
+    def is_tabstop(self)->bool:
+        return self.__tabstop
 class Text(BaseContent):
     # 换行会被该类内部自动处理
 
-    def __init__(self, raw_text:str="") -> None:
-        self.__raw_text = raw_text
+    def __init__(self, raw_text:str="",style:int=Run.normal) -> None:
         self.__runs:List[Run] = []
-        # 处理粗体，斜体，公式
+        if raw_text:
+            self.__runs.append(Run(raw_text,style))
 
-        self.__runs.append(Run(raw_text,Run.normal))
-        self.__runs.append(Run(r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",Run.formula))
+    def add_run(self, run:Run)->Text:
+        self.__runs.append(run)
+        return self
 
-    def to_paragraph(self)->str:
-        return self.__raw_text
+    def add_hfill(self)->Text:
+        self.__runs.append(Run.get_tabstop())
+        return self
 
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
         p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         for run in self.__runs:
-            run.render_run(p.add_run())
+            if not run.is_tabstop():
+                run.render_run(p.add_run())
+            else:
+                # https://stackoverflow.com/questions/58656450/how-to-use-tabletop-by-python-docx
+                sec = DM.get_doc().sections[0]
+                margin_end = docx.shared.Inches(
+                    sec.page_width.inches - (sec.left_margin.inches + sec.right_margin.inches))
+                tab_stops = p.paragraph_format.tab_stops
+                # adding new tab stop, to the end point, and making sure that it's `RIGHT` aligned.
+                tab_stops.add_tab_stop(margin_end, docx.enum.text.WD_TAB_ALIGNMENT.RIGHT)
+                
         p.paragraph_format.first_line_indent = Cm(0.82)
         new_offset = new_offset + 1
         return new_offset
@@ -192,8 +212,49 @@ class Row():
         self.row:List[str] = data
         self.has_top_border = top_border
 
+class Formula(BaseContent):
+    def __init__(self,title:str,formula:str) -> None:
+        super().__init__()
+        self.__title:str = title
+        self.__formula:str = formula
+        
+    def render_paragraph(self,offset: int) -> int:
+        new_offset = offset
+        p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        table = DM.get_doc().add_table(rows=1,cols=3)
+        p._p.addnext(table._tbl)
+        DM.delete_paragraph_by_index(new_offset)
+
+        # 公式cell
+        cell_formula = table.rows[0].cells[1]
+        cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        empty = {'color':Table.white}
+        Table.set_cell_border(
+            cell_formula,
+            top=empty,
+            bottom=empty,
+            start=empty,
+            end=empty
+        )
+        _p = cell_formula.paragraphs[0]
+        _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = _p.add_run()
+        Run(self.__formula,Run.formula).render_run(r)
+
+        # 标号cell
+        cell_idx = table.rows[0].cells[2]
+        cell_idx.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        cell_idx_p = cell_idx.paragraphs[0]
+        cell_idx_p.text = self.__title
+        cell_idx_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        return new_offset
+
+
 class Table(BaseContent):
     # table的最后一行默认有下边框，剩下依靠row的top-border自行决定
+    black = "#000000"
+    white = "#ffffff"
     def __init__(self,title:str, table:List[Row]) -> None:
         super().__init__()
         self.__title = title
@@ -231,18 +292,16 @@ class Table(BaseContent):
         new_offset = new_offset + 1
 
         # 填充内容, 编辑表格样式
-        black = "#000000"
-        white = "#ffffff"
         for i,row in enumerate(self.__table):
             for j,cell_str in enumerate(row.row):
                 cell = table.rows[i].cells[j]
                 cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 Table.set_cell_border(
                     cell,
-                    top={"val":'single','color':white if not row.has_top_border else black},
-                    bottom = {"val":'single', "color":white if i!=self.__rows-1 else black},
-                    start={"color":white},
-                    end={"color":white}
+                    top={"val":'single','color':self.white if not row.has_top_border else self.black},
+                    bottom = {"val":'single', "color":self.white if i!=self.__rows-1 else self.black},
+                    start={"color":self.white},
+                    end={"color":self.white}
                 )
                 if cell_str == None:
                     if i == 0:
@@ -332,7 +391,7 @@ class Metadata(Component):
         if head_length <0:
             raise ValueError("值过长")
         content = " " * head_length + data + " " * (blank_length-get_data_len(data)-head_length)
-        print(data,get_data_len(data))
+        #print(data,get_data_len(data))
         return content
 
     def render_template(self):
@@ -357,7 +416,7 @@ class Metadata(Component):
         for line_no in line_mapping:
             if line_mapping[line_no] == None:
                 continue
-            print(len(DM.get_doc().paragraphs[line_no].runs[-1].text))
+            #print(len(DM.get_doc().paragraphs[line_no].runs[-1].text))
             DM.get_doc().paragraphs[line_no].runs[-1].text = self.__fill_blank(BLANK_LENGTH,line_mapping[line_no])
 
 class Abstract(Component):
@@ -426,45 +485,95 @@ class MainContent(Component): # 正文
 
     def __init__(self) -> None:
         super().__init__()
-        self.__last_blk:Block = None
+        self.__prev:Dict[str,Block] = {
+            'blk':None,
+            'chapter':None,
+            'section':None,
+            'subsection':None
+        }
+        self.__last_subblk:Block = None
         
-    def get_last_block(self)->Block:
-        if not self.__last_blk:
+    def get_last_subblock(self)->Block:
+        if 'blk' not in self.__prev:
             raise ValueError("last blk is not yet set")
-        return self.__last_blk
+        return self.__prev['blk']
 
     # add_chapter returns the added chapter
     def add_chapter(self,title:str)->Block:
         new_chapter = Block()
-        self.__last_blk = new_chapter
+
+        # set prev pointers
+        self.__prev['blk'] = new_chapter
+        self.__prev['chapter'] = new_chapter
+
         new_chapter.set_title(title,Block.heading_1)
         return self.get_internal_text().add_sub_block(new_chapter)
     
     # add_section returns the added section
-    def add_section(self, chapter:Block, title:str)->Block:
+    def add_section(self, title:str, chapter:Block=None)->Block:
+        if not chapter:
+            if self.__prev.get('chapter'):
+                chapter = self.__prev['chapter']
+            else:
+                raise KeyError("chapter must be initialized before section")
+
         new_section = Block()
-        self.__last_blk = new_section
+
+        # set prev pointers
+        self.__prev['blk'] = new_section
+        self.__prev['section'] = new_section
+
         new_section.set_title(title,Block.heading_2)
         return chapter.add_sub_block(new_section)
 
     # add_subsection returns the added subsection
-    def add_subsection(self, section:Block, title:str)->Block:
+    def add_subsection(self, title:str,section:Block=None)->Block:
+        if not section:
+            if 'section' in self.__prev:
+                section = self.__prev['section']
+            else:
+                raise KeyError("section must be initialized before subsection")
+        
         new_subsection = Block()
-        self.__last_blk = new_subsection
+        
+        # set prev pointers
+        self.__prev['blk'] = new_subsection
+        self.__prev['subsection'] = new_subsection
+
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
 
-    def add_text(self, location:Block, text:str): # 公式inline解析
-        location.add_content(content_list=Text.read(text))
-    
-    def add_image(self, location:Block, images:List[ImageData]):
+    # 独立的公式, 内联公式应该拿到text之后使用text.add_run
+    def add_formula(self, title:str, formula:str, location:Block=None):
+        if not location:
+            location = self.get_last_subblock()
+        location.add_content(Formula(title,formula))
+
+    def add_text(self, text:Union[str,Run], location:Block=None)->Text: # 返回最后一块text
+        if not location:
+            location = self.get_last_subblock()
+        if type(text)==str:
+            content = Text.read(text)
+            # location对应block内含多个paragraph
+            location.add_content(content_list=content)
+            return content[-1]
+        elif type(text)==Run:
+            txt = Text()
+            txt.add_run(text)
+            location.add_content(txt)
+            return txt
+        else:
+            raise TypeError("expect str/Run")
+
+    def add_image(self, images:List[ImageData], location:Block=None):
+        if not location:
+            location = self.get_last_subblock()
         location.add_content(Image(images))
 
-    def add_table(self, location:Block, title:str, table:List[Union[None,List[str]]]):
+    def add_table(self, title:str, table:List[Union[None,List[str]]], location:Block=None):
+        if not location:
+            location = self.get_last_subblock()
         location.add_content(Table(title,table))
-
-    def append_paragraph(self, text:str):
-        self.get_last_block().add_content(Text(text))
 
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
     def render_template(self) -> int:
@@ -484,7 +593,7 @@ class MainContent(Component): # 正文
 class Introduction(Component): #引言 由于正文定位依赖引言，如果没写引言，依旧会生成引言，最后删掉
     def render_template(self) -> int:
         anchor_text = "引    言"
-        incr_next = 3
+        incr_next = 2
         incr_kw = "正文格式说明"
         anchor_style_name = "Heading 1"
         return super().render_template(anchor_text, incr_next, incr_kw, anchor_style_name=anchor_style_name)
@@ -558,7 +667,7 @@ class Block(): #content
 
     def __init__(self) -> None:
         self.__title:str = None
-        self.__content_list:List[Union[Text,Image,Formula]] = []
+        self.__content_list:List[Union[Text,Image,Table,Formula]] = []
         self.__sub_blocks:List[Block] = []
         self.__id:int = None
 
@@ -577,8 +686,8 @@ class Block(): #content
         self.__sub_blocks.append(block)
         return block
 
-    def add_content(self,content:Union[Text,Image,Formula,Table]=None,
-            content_list:Union[List[Text],List[Image],List[Formula],List[Table]]=[]) -> Block:
+    def add_content(self,content:Union[Text,Image,Table,Formula]=None,
+            content_list:Union[List[Text],List[Image],List[Table],List[Formula]]=[]) -> Block:
         if content:
             self.__content_list.append(content)
         for i in content_list:
@@ -658,16 +767,16 @@ if __name__ == "__main__":
     
     doc = docx.Document("毕业设计（论文）模板-docx.docx")
     DM.set_doc(doc)
-    # meta = Metadata(doc_target=doc)
-    # meta.school = "电子信息与电气工程"
-    # meta.number = "201800000"
-    # meta.auditor = "张三"
-    # meta.finish_date = "1234年5月6号"
-    # meta.teacher = "里斯"
-    # meta.major = "计算机科学与技术"
-    # meta.title_en = "what is this world"
-    # meta.title_zh_CN = "这是个怎样的世界"
-    # meta.render_template()
+    meta = Metadata()
+    meta.school = "电子信息与电气工程"
+    meta.number = "201800000"
+    meta.auditor = "张三"
+    meta.finish_date = "1234年5月6号"
+    meta.teacher = "里斯"
+    meta.major = "计算机科学与技术"
+    meta.title_en = "what is this world"
+    meta.title_zh_CN = "这是个怎样的世界"
+    meta.render_template()
 
     abs = Abstract()
     a = """CommonMark中并未定义普通文本高亮。
@@ -697,30 +806,35 @@ But if you know for sure none of those are present, these few lines should get t
 
     mc = MainContent()
     c1 = mc.add_chapter("第一章 刘姥姥")
-    s1 = mc.add_section(c1, "1.1 asdfasdf")
-    s2 = mc.add_section(c1, "1.2 bbbb")
+    s1 = mc.add_section("1.1 asdfasdf",chapter=c1)
+    s2 = mc.add_section("1.2 bbbb",chapter=c1)
     h = """目前的娛樂型電腦螢幕市場，依照玩家的需求大致可以分為兩大勢力：一派是主打對戰類型
     的電競玩家、另一派則主打追劇的多媒體影音玩家。前者需要需要高更新率的螢幕，在分秒必爭的對戰中搶得先機；後者則需要較高的解析度以及HDR的顯示內容，好用來欣賞畫面的每一個細節。"""
-    mc.add_text(c1,h)
-    mc.add_text(s2,h)
+    mc.add_text(h,location=c1)
+    mc.add_text(h,location=s2)
     c2 = mc.add_chapter("第二章 菜花")
-    s3 = mc.add_section(c2,"2.1 aaa")
-    ss1 = mc.add_subsection(s3,"2.1.1 asdf")
-    mc.add_text(ss1,h)
-    mc.add_image(ss1,[
+    s3 = mc.add_section("2.1 aaa",chapter=c2)
+    ss1 = mc.add_subsection("2.1.1 asdf",section=s3)
+    txt = mc.add_text(h,location=ss1)
+    txt.add_run(Run("this should be bold",Run.bold))
+    txt.add_run(Run("italic and bold",Run.italics|Run.bold))
+    mc.add_image([
         ImageData("classes.png","图1：these are the classes"),
         ImageData("classes.png","图2:asldkfja;sldkf")
-    ])
+    ],location=ss1)
+    mc.add_formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",location=ss1)
+    mc.add_text(Run("only italics",Run.italics),location=ss1)
+
     c3 = mc.add_chapter("第三章 大观园")
-    mc.add_text(c3,t)
+    mc.add_text(t,location=c3)
     data = [
         Row(['第一章','第二章','第三章'],top_border=True),
         Row(['刘姥姥初试钢铁侠','刘姥姥初试大不净者','刘姥姥倒拔绿巨人'],top_border=True),
         Row(['刘姥姥初试惊奇队长',None,'刘姥姥菜花染诸神']),
         Row(['菜花反噬！','天地乖离菜花之星','重启刘姥姥菜花宇宙'],top_border=True)
     ]
-    mc.add_table(c3,"表1 刘姥姥背叛斯大林",data)
-    mc.add_text(c3,"wtf is this?")
+    mc.add_table("表1 刘姥姥背叛斯大林",data,location=c3)
+    mc.add_text("wtf is this?",location=c3)
     mc.render_template()
 
     conc = Conclusion()
