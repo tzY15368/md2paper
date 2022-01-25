@@ -4,9 +4,11 @@ import logging
 import re
 from functools import reduce
 import os
+import docx
+from docx import Document
 
 from mdext import MDExt
-from md2paper import *
+import md2paper as word
 
 file_dir = ""
 debug = True
@@ -75,7 +77,7 @@ def split_title(title):
 
 # 处理标签
 
-def process_headline(head_counter: List[int], h_label: str, headline: str):
+def process_headline(head_counter: list[int], h_label: str, headline: str):
     level = int(h_label[1:])
     assert_warning(1 <= level and level <= len(head_counter)+1,
                    "标题层级应该递进" + headline)
@@ -151,15 +153,15 @@ def process_img(img):
 def process_table(title, table):
     data = []
     # 表头，有上实线
-    data.append(Row([rbk(i.text) for i in table.find("thead").find_all("th")],
-                    top_border=True))
+    data.append(word.Row([rbk(i.text) for i in table.find("thead").find_all("th")],
+                         top_border=True))
     has_border = True  # 表身第一行有上实线
     for tr in table.find("tbody").find_all("tr"):
         row = [rbk(i.text) for i in tr.find_all("td")]  # get all text
         row = list(map(lambda x: None if x == '' else x,
                        row))  # replace '' with None
         if has_border:
-            data.append(Row(row, top_border=True))
+            data.append(word.Row(row, top_border=True))
             has_border = False
         else:
             is_border = True
@@ -174,7 +176,7 @@ def process_table(title, table):
             if is_border:
                 has_border = True  # 自定义的实线，下一行数据有上实线
             else:
-                data.append(Row(row))
+                data.append(word.Row(row))
 
     ali, title = split_title(title)
     return ("table", {"alias": ali,
@@ -265,21 +267,22 @@ def set_content(cont_block, conts):
                 para = cont_block.add_text(name)
             for run in cont:
                 if run["type"] == "text":
-                    para.add_run(Run(run["text"], Run.normal))
+                    para.add_run(word.Run(run["text"], word.Run.normal))
                 elif run["type"] == "strong":
-                    para.add_run(Run(run["text"], Run.bold))
+                    para.add_run(word.Run(run["text"], word.Run.bold))
                 elif run["type"] == "em":
-                    para.add_run(Run(run["text"], Run.italics))
+                    para.add_run(word.Run(run["text"], word.Run.italics))
                 elif run["type"] == "strong-em":
-                    para.add_run(Run(run["text"], Run.italics | Run.bold))
+                    para.add_run(word.Run(run["text"],
+                                          word.Run.italics | word.Run.bold))
                 elif run["type"] == "math-inline":
-                    para.add_run(Run(run["text"], Run.formula))
+                    para.add_run(word.Run(run["text"], word.Run.formula))
                 elif run["type"] == "ref":
-                    para.add_run(Run(run["text"], Run.normal))
+                    para.add_run(word.Run(run["text"], word.Run.normal))
                 else:
                     print("还没实现now", name)
         elif name == "img":
-            cont_block.add_image([ImageData(cont["src"], cont["title"])])
+            cont_block.add_image([word.ImageData(cont["src"], cont["title"])])
         elif name == "table":
             cont_block.add_table(cont['title'], cont['data'])
         elif name == "math":
@@ -347,7 +350,7 @@ def get_metadata(soup: BeautifulSoup):
                   for i in data_lines]
     data_dict = dict(data_pairs)
 
-    meta = Metadata()
+    meta = word.Metadata()
     meta.title_zh_CN = rbk(mete_h1.text)
     meta.title_en = rbk(mete_h1.find_next_sibling("h2").text)
     meta.school = data_dict["学院（系）"]
@@ -385,7 +388,7 @@ def get_abs(soup: BeautifulSoup):
     # TODO
     # abs sp check
 
-    abs = Abstract()
+    abs = word.Abstract()
     abs.add_text(assemble_ps(conts_cn), assemble_ps(conts_en))
     abs.set_keyword(keywords_cn, keywords_en)
 
@@ -400,7 +403,7 @@ def get_intro(soup: BeautifulSoup):
     # TODO
     # intro sp check
 
-    intro = Introduction()
+    intro = word.Introduction()
     intro.add_text(assemble_ps(conts))  # FIXME
 
     return intro
@@ -412,7 +415,7 @@ def get_body(soup: BeautifulSoup):
                               soup.find("h1", string=re.compile("结论")))
     conts = get_index(conts)
 
-    mc = MainContent()
+    mc = word.MainContent()
     set_content(mc, conts)
 
     return mc
@@ -425,7 +428,7 @@ def get_conclusion(soup: BeautifulSoup):
     # TODO
     # conclusion sp check
 
-    conclusion = Conclusion()
+    conclusion = word.Conclusion()
     conclusion.add_text(assemble_ps(conts))  # FIXME
 
     return conclusion
@@ -470,7 +473,7 @@ def get_thanks(soup: BeautifulSoup):
     # TODO
     # thanks sp check
 
-    ack = Acknowledgments()
+    ack = word.Acknowledgments()
     ack.add_text(assemble_ps(conts))
     return ack
 
@@ -560,7 +563,7 @@ class GraduationPaper(Paper):
         self.record = get_record(self.soup)    # 修改记录
         self.thanks = get_thanks(self.soup)    # 致谢
 
-    def render(self):
+    def render(self, doc: Document):
         self.meta.render_template()  # metadata
         self.abs.render_template()   # 摘要 Abstract
         self.intro.render_template()  # 引言
@@ -574,15 +577,15 @@ class GraduationPaper(Paper):
 
 if __name__ == "__main__":
     doc = docx.Document("毕业设计（论文）模板-docx.docx")
-    DM.set_doc(doc)
+    word.DM.set_doc(doc)
 
     paper = GraduationPaper()
     paper.load_md("论文模板.md")
     paper.encode()
 
-    paper.render()
+    paper.render(doc)
 
-    DM.update_toc()
+    word.DM.update_toc()
     doc.save("out.docx")
 
 '''
