@@ -116,15 +116,19 @@ class Component():
 
 
 class Run():
-    normal = 1
-    italics = 2
-    bold = 4
-    formula = 8
+    Normal = 1
+    Italics = 2
+    Bold = 4
+    Formula = 8
+    Superscript = 16
+    Subscript = 32
     def __init__(self,text:str,style:int=0,tabstop:bool=False) -> None:
         self.text = text
-        self.bold = style & self.bold != 0
-        self.italics = style & self.italics != 0
-        self.formula = style & self.formula != 0
+        self.bold = style & self.Bold != 0
+        self.italics = style & self.Italics != 0
+        self.formula = style & self.Formula != 0
+        self.subscript = style & self.Subscript != 0
+        self.superscript = style & self.Superscript != 0
         self.__tabstop = tabstop
     
     def render_run(self,run):
@@ -132,6 +136,9 @@ class Run():
             run.text = self.text
             run.bold = self.bold
             run.italic = self.italics
+            run.font.subscript = self.subscript
+            run.font.superscript = self.superscript
+
         else:
             word_math = latex_to_word(self.text)
             run._element.append(word_math)
@@ -145,7 +152,7 @@ class Run():
 class Text(BaseContent):
     # 换行会被该类内部自动处理
 
-    def __init__(self, raw_text:str="",style:int=Run.normal) -> None:
+    def __init__(self, raw_text:str="",style:int=Run.Normal) -> None:
         self.__runs:List[Run] = []
         if raw_text:
             self.__runs.append(Run(raw_text,style))
@@ -247,7 +254,7 @@ class Formula(BaseContent):
         _p = cell_formula.paragraphs[0]
         _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r = _p.add_run()
-        Run(self.__formula,Run.formula).render_run(r)
+        Run(self.__formula,Run.Formula).render_run(r)
 
         # 标号cell
         cell_idx = table.rows[0].cells[2]
@@ -809,6 +816,11 @@ But if you know for sure none of those are present, these few lines should get t
 现在就称其为好奇心。我感谢警告，但我仍然感到好奇。
 一个用例是，如果您要使用Django库公开的Form类，但不包含其字段之一。在Django中，表单字段是由某些类属性定义的。例如，请参阅此SO问题。"""
     intro.add_text(t)
+    txt = Text().add_run(Run("a"))
+    txt.add_run(Run("bbb",Run.Italics|Run.Subscript))
+    txt.add_run(Run(" and then A",Run.Bold))
+    txt.add_run(Run("2",Run.Superscript))
+    intro.add_text([txt])
     intro.render_template()
 
     mc = MainContent()
@@ -823,14 +835,14 @@ But if you know for sure none of those are present, these few lines should get t
     s3 = mc.add_section("2.1 aaa",chapter=c2)
     ss1 = mc.add_subsection("2.1.1 asdf",section=s3)
     txt = mc.add_text(h,location=ss1)
-    txt.add_run(Run("this should be bold",Run.bold))
-    txt.add_run(Run("italic and bold",Run.italics|Run.bold))
+    txt.add_run(Run("this should be bold",Run.Bold))
+    txt.add_run(Run("italic and bold",Run.Italics|Run.Bold))
     mc.add_image([
         ImageData("classes.png","图1：these are the classes"),
         ImageData("classes.png","图2:asldkfja;sldkf")
     ],location=ss1)
     mc.add_formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",location=ss1)
-    mc.add_text(Run("only italics",Run.italics),location=ss1)
+    mc.add_text(Run("only italics",Run.Italics),location=ss1)
 
     c3 = mc.add_chapter("第三章 大观园")
     mc.add_text(t,location=c3)
@@ -851,7 +863,7 @@ But if you know for sure none of those are present, these few lines should get t
 设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
     #conc.set_conclusion(e)
     conc.add_text(e)
-    conc.add_text([Text().add_run(Run("additional italics text",Run.italics)), Image([ImageData("classes.png","图3：这是classes")])])
+    conc.add_text([Text().add_run(Run("additional italics text",Run.Italics)), Image([ImageData("classes.png","图3：这是classes")])])
     conc.render_template()
 
     ref = References()
