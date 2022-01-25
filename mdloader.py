@@ -93,8 +93,11 @@ def process_ps(p, ollevel=4):
         if i.name == None:
             data.append({"type": "text", "text": rbk(i.text)})
         elif i.name == "strong":
-            data.append({"type": "strong", "text": rbk(i.text)})
-            # 暂不支持粗斜体
+            assert_warning(len(i.contents) == 1, "只允许粗斜体，不允许复杂嵌套")
+            if i.contents[0].name == "em":
+                data.append({"type": "strong-em", "text": rbk(i.text)})
+            else:
+                data.append({"type": "strong", "text": rbk(i.text)})
         elif i.name == "em":
             data.append({"type": "em", "text": rbk(i.text)})
         else:  # 需要分段
@@ -156,7 +159,7 @@ def process_lis(li, level):
         conts = process_ps(li, level+1)
     title = conts[0]
     conts = conts[1:]
-    assert_warning(len(title[1]) == 1, "层次（列表）的标题只能使用无格式文字")
+    assert_warning(len(title[1]) == 1, "层次（列表）的标题只能使用无格式文字" + str(title))
     conts = [("fh"+str(level), title[1][0]["text"])] + conts
     return conts
 
@@ -203,13 +206,24 @@ def get_content_from(cur, ollevel=4):
 def set_content(cont_block, conts):
     for (name, cont) in conts:
         if name == "h1":
-            chapter = cont_block.add_chapter(cont)
+            cont_block.add_chapter(cont)
         elif name == "h2":
-            section = cont_block.add_section(chapter, cont)
+            cont_block.add_section(cont)
         elif name == "h3":
-            subsection = cont_block.add_subsection(section, cont)
+            cont_block.add_subsection(cont)
         elif name == "p":
-            cont_block.append_paragraph(assemble_ps([(name, cont)]))
+            para = cont_block.add_text("")
+            for run in cont:
+                if run["type"] == "text":
+                    para.add_run(Run(run["text"], Run.normal))
+                elif run["type"] == "strong":
+                    para.add_run(Run(run["text"], Run.bold))
+                elif run["type"] == "em":
+                    para.add_run(Run(run["text"], Run.italics))
+                elif run["type"] == "strong-em":
+                    para.add_run(Run(run["text"], Run.italics | Run.bold))
+                else:
+                    print("还没实现now", name)
         elif name == "img":
             print("还没实现now", name)
         elif name == "table":
