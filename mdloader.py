@@ -5,6 +5,7 @@ import re
 from functools import reduce
 import os
 
+from mdmathext import MDMathExt
 from md2paper import *
 
 file_dir = ""
@@ -110,6 +111,8 @@ def process_ps(p, ollevel=4):
                 data.append({"type": "strong", "text": rbk(i.text)})
         elif i.name == "em":
             data.append({"type": "em", "text": rbk(i.text)})
+        elif i.name == "math-inline":
+            data.append({"type": "math-inline", "text": i.text})
         else:  # 需要分段
             if data:
                 ps.append(("p", data))
@@ -191,6 +194,10 @@ def process_ol(ol, level):
     return data
 
 
+def process_math(title, math):
+    return ("math", {"title": title, "text": math.text})
+
+
 # 提取内容
 
 def get_content_until(cur, until, ollevel=4):
@@ -212,6 +219,10 @@ def get_content_until(cur, until, ollevel=4):
             conts.append(process_table(table_name, cur))
         elif cur.name == "ol":
             conts += process_ol(cur, ollevel)
+        elif cur.name == "math":
+            math_title = raw_text(conts[-1][1])
+            conts = conts[:-1]
+            conts.append(process_math(math_title, cur))
         else:
             log_error("这是啥？" + cur.prettify())
         cur = cur.next_sibling
@@ -244,12 +255,16 @@ def set_content(cont_block, conts):
                     para.add_run(Run(run["text"], Run.italics))
                 elif run["type"] == "strong-em":
                     para.add_run(Run(run["text"], Run.italics | Run.bold))
+                elif run["type"] == "math-inline":
+                    para.add_run(Run(run["text"], Run.formula))
                 else:
                     print("还没实现now", name)
         elif name == "img":
             cont_block.add_image([ImageData(cont["src"], cont["title"])])
         elif name == "table":
             cont_block.add_table(cont['title'], cont['data'])
+        elif name == "math":
+            cont_block.add_formula(cont['title'], cont['text'])
         else:
             print("还没实现now", name)
 
@@ -423,7 +438,8 @@ def load_md(file_name: str, file_type: str):
         md_file = f.read()
     md_html = markdown.markdown(md_file,
                                 tab_length=3,
-                                extensions=['markdown.extensions.tables'])
+                                extensions=['markdown.extensions.tables',
+                                            MDMathExt()])
     soup = BeautifulSoup(md_html, 'html.parser')
     for i in soup(text=lambda text: isinstance(text, Comment)):
         i.extract()  # 删除 html 注释
