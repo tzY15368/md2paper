@@ -80,6 +80,11 @@ class DocManager():
 
 DM = DocManager
 
+class BaseContent():
+
+    # 在指定offset 【向上】填充paragraph，返回填充后最后一段的offset+1
+    def render_paragraph(offset:int)->int:
+        raise NotImplementedError
 class Component():
     def __init__(self) -> None:
         self.__internal_text = Block()
@@ -87,8 +92,15 @@ class Component():
     def get_internal_text(self)->Block:
         return self.__internal_text
 
-    def add_text(self, text:str):
-        self.__internal_text.add_content(content_list=Text.read(text))
+    def add_text(self, text:Union[str,List[BaseContent]]):
+        if type(text)==str:
+            self.__internal_text.add_content(content_list=Text.read(text))
+
+        elif type(text)==list and sum([1 if isinstance(i,BaseContent) else 0 for i in text])==len(text):
+            self.__internal_text.add_content(content_list=text)
+
+        else:
+            raise TypeError("expected text/List[BaseContent]")
 
     # anchor_text: 用于找到插入段落位置
     # incr_next: 用于在插入新内容后往后删老模板当前段内容，
@@ -102,11 +114,6 @@ class Component():
             #print('deleted 1 line for anchor',anchor_text)
         return self.__internal_text.render_template(offset)
 
-class BaseContent():
-
-    # 在指定offset 【向上】填充paragraph，返回填充后最后一段的offset+1
-    def render_paragraph(offset:int)->int:
-        raise NotImplementedError
 
 class Run():
     normal = 1
@@ -844,6 +851,7 @@ But if you know for sure none of those are present, these few lines should get t
 设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
     #conc.set_conclusion(e)
     conc.add_text(e)
+    conc.add_text([Text().add_run(Run("additional italics text",Run.italics)), Image([ImageData("classes.png","图3：这是classes")])])
     conc.render_template()
 
     ref = References()
