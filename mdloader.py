@@ -95,6 +95,8 @@ def process_ps(p, ollevel=4):
     data = []
     for i in p.children:
         if i.name == None:
+            if i.text == "\n":
+                continue
             data.append({"type": "text", "text": rbk(i.text)})
         elif i.name == "strong":
             assert_warning(len(i.contents) == 1, "只允许粗斜体，不允许复杂嵌套")
@@ -161,10 +163,7 @@ def process_lis(li, level):
         conts = get_content_from(li.contents[0], level+1)
     else:  # text
         conts = process_ps(li, level+1)
-    title = conts[0]
-    conts = conts[1:]
-    assert_warning(len(title[1]) == 1, "层次（列表）的标题只能使用无格式文字" + str(title))
-    conts = [("fh"+str(level), title[1][0]["text"])] + conts
+    conts[0] = ("fh" + str(level), conts[0][1])
     return conts
 
 
@@ -172,6 +171,16 @@ def process_ol(ol, level):
     assert_error(level <= 5, "层次至多两层")
     datas = [process_lis(i, level)
              for i in ol.find_all("li", recursive=False)]
+    # make index
+    for i in range(len(datas)):
+        li_data = datas[i][0]
+        if level == 4:
+            li_data[1].insert(
+                0, {"type": "text", "text": "（{}） ".format(i+1)})
+        else:
+            assert_warning(i < 20, "层次二不能超过 20 项")
+            li_data[1].insert(
+                0, {"type": "text", "text": "{} ".format(chr(i+0x2460))})  # get ①②..⑳
     data = reduce(lambda x, y: x + y, datas)
     return data
 
@@ -215,7 +224,7 @@ def set_content(cont_block, conts):
             cont_block.add_section(cont)
         elif name == "h3":
             cont_block.add_subsection(cont)
-        elif name == "p":
+        elif name in ["p", "fh4", "fh5"]:
             para = cont_block.add_text("")
             for run in cont:
                 if run["type"] == "text":
@@ -441,8 +450,8 @@ if __name__ == "__main__":
 ("h2", "something")
 ("h3", "something")
 
-("fh4", "something")
-("fh5", "something")
+("fh4", like p)
+("fh5", like p)
 
 ("p", [("text",      "something"),
        ("strong",    "something"),
