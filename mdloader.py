@@ -3,8 +3,12 @@ from bs4 import BeautifulSoup, Comment
 import logging
 import re
 from functools import reduce
+import os
 
 from md2paper import *
+
+file_dir = ""
+debug = True
 
 
 # 检查
@@ -124,7 +128,9 @@ def process_ps(p, ollevel=4):
 
 
 def process_img(img):
-    return ("img", {"title": img["alt"], "src": img["src"]})
+    global file_dir
+    img_path = os.path.join(file_dir, img["src"])
+    return ("img", {"title": img["alt"], "src": img_path})
 
 
 def process_table(title, table):
@@ -225,7 +231,10 @@ def set_content(cont_block, conts):
         elif name == "h3":
             cont_block.add_subsection(cont)
         elif name in ["p", "fh4", "fh5"]:
-            para = cont_block.add_text("")
+            if not debug:
+                para = cont_block.add_text("")
+            else:
+                para = cont_block.add_text(name)
             for run in cont:
                 if run["type"] == "text":
                     para.add_run(Run(run["text"], Run.normal))
@@ -386,9 +395,9 @@ def get_thanks(soup: BeautifulSoup):
 # 处理文章
 
 def handle_paper(soup: BeautifulSoup):
-    # test
-    with open("out.html", "w") as f:
-        f.write(soup.prettify())
+    if debug:
+        with open("out.html", "w") as f:
+            f.write(soup.prettify())
 
     data_ls = [
         get_metadata(soup),    # metadata
@@ -419,6 +428,8 @@ def load_md(file_name: str, file_type: str):
     for i in soup(text=lambda text: isinstance(text, Comment)):
         i.extract()  # 删除 html 注释
 
+    global file_dir
+    file_dir = os.path.dirname(file_name)
     if file_type == "论文":
         return handle_paper(soup)
     elif file_type == "外文翻译":
