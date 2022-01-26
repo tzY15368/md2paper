@@ -341,21 +341,6 @@ def get_index(conts):
 
 # 获得每个论文模块
 
-
-def get_appendix(soup: BeautifulSoup):
-    appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
-    appendix_h1s.append(soup.find("h1", string=re.compile("修改记录")))
-    for i in range(0, len(appendix_h1s)-1):
-        conts = get_content_until(appendix_h1s[i].next_sibling,
-                                  appendix_h1s[i+1])
-    # TODO
-    # appendix sp check
-    # some thing add_content
-    # if no appendix
-    print(appendix_h1s)  # FIXME
-    return "tmp"  # TODO
-
-
 def get_record(soup: BeautifulSoup):
     mod_record_h1 = soup.find("h1", string=re.compile("修改记录"))
     conts = get_content_until(mod_record_h1.next_sibling,
@@ -593,6 +578,18 @@ class AppenPart(PaperPart):
         return title
 
 
+class RecordPart(PaperPart):
+    def get_contents(self, soup: BeautifulSoup):
+        mod_record_h1 = soup.find("h1", string=re.compile("修改记录"))
+        conts = get_content_until(mod_record_h1.next_sibling,
+                                  soup.find("h1", string=re.compile("致谢")))
+        self.contents = conts
+
+    def _set_contents(self):
+        self.block = word.ChangeRecord()
+        # self._set_body() # FIXME
+
+
 class GraduationPaper(Paper):
     def __init__(self):
         self.meta = MetaPart()
@@ -602,6 +599,7 @@ class GraduationPaper(Paper):
         self.conc = ConcPart()
         self.ref = RefPart()
         self.appen = AppenPart()
+        self.record = RecordPart()
 
     def get_contents(self):
         self.meta.get_contents(self.soup)    # metadata
@@ -612,7 +610,7 @@ class GraduationPaper(Paper):
         self.conc.get_contents(self.soup)    # 结论
         self.ref.get_contents(self.soup)    # 参考文献
         self.appen.get_contents(self.soup)   # 附录
-        self.record = get_record(self.soup)    # 修改记录
+        self.record.get_contents(self.soup)    # 修改记录
         self.thanks = get_thanks(self.soup)    # 致谢
 
     def compile(self):
@@ -629,7 +627,7 @@ class GraduationPaper(Paper):
         self.conc.render()  # 结论
         self.ref.render()  # 参考文献
         self.appen.render()  # 附录
-        # self.record.render_template()  # 修改记录
+        self.record.render()  # 修改记录
         self.thanks.render_template()  # 致谢
 
         word.DM.update_toc()
