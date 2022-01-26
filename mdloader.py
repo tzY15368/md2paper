@@ -339,47 +339,7 @@ def get_index(conts):
     return conts
 
 
-# 获得每个论文模块
-
-def get_record(soup: BeautifulSoup):
-    mod_record_h1 = soup.find("h1", string=re.compile("修改记录"))
-    conts = get_content_until(mod_record_h1.next_sibling,
-                              soup.find("h1", string=re.compile("致谢")))
-    # TODO
-    # record sp check
-    # some thing add_content
-    print(mod_record_h1)  # FIXME
-    return "tmp"  # TODO
-
-
-def get_thanks(soup: BeautifulSoup):
-    thanks_h1 = soup.find("h1", string=re.compile("致谢"))
-    conts = get_content_from(thanks_h1.next_sibling)
-
-    # TODO
-    # thanks sp check
-
-    ack = word.Acknowledgments()
-    ack.add_text(assemble_ps(conts))
-    return ack
-
-
-class Paper:
-    def load_md(self, md_path: str):
-        with open(md_path, "r") as f:
-            md_file = f.read()
-        md_html = markdown.markdown(md_file,
-                                    tab_length=3,
-                                    extensions=['markdown.extensions.tables',
-                                                MDExt()])
-        self.soup = BeautifulSoup(md_html, 'html.parser')
-        for i in self.soup(text=lambda text: isinstance(text, Comment)):
-            i.extract()  # 删除 html 注释
-
-        if debug:
-            with open("out.html", "w") as f:
-                f.write(self.soup.prettify())
-
+# 每个论文模块
 
 class PaperPart:
     def __init__(self):
@@ -590,6 +550,35 @@ class RecordPart(PaperPart):
         # self._set_body() # FIXME
 
 
+class ThanksPart(PaperPart):
+    def get_contents(self, soup: BeautifulSoup):
+        thanks_h1 = soup.find("h1", string=re.compile("致谢"))
+        self.contents = get_content_from(thanks_h1.next_sibling)
+
+    def _set_contents(self):
+        self.block = word.Acknowledgments()
+        self.block.add_text(assemble_ps(self.contents))
+
+
+class Paper:
+    def load_md(self, md_path: str):
+        with open(md_path, "r") as f:
+            md_file = f.read()
+        global file_dir
+        file_dir = os.path.dirname(md_path)
+        md_html = markdown.markdown(md_file,
+                                    tab_length=3,
+                                    extensions=['markdown.extensions.tables',
+                                                MDExt()])
+        self.soup = BeautifulSoup(md_html, 'html.parser')
+        for i in self.soup(text=lambda text: isinstance(text, Comment)):
+            i.extract()  # 删除 html 注释
+
+        if debug:
+            with open("out.html", "w") as f:
+                f.write(self.soup.prettify())
+
+
 class GraduationPaper(Paper):
     def __init__(self):
         self.meta = MetaPart()
@@ -600,6 +589,7 @@ class GraduationPaper(Paper):
         self.ref = RefPart()
         self.appen = AppenPart()
         self.record = RecordPart()
+        self.thanks = ThanksPart()
 
     def get_contents(self):
         self.meta.get_contents(self.soup)    # metadata
@@ -608,10 +598,10 @@ class GraduationPaper(Paper):
         self.intro.get_contents(self.soup)   # 引言
         self.main.get_contents(self.soup)    # 正文
         self.conc.get_contents(self.soup)    # 结论
-        self.ref.get_contents(self.soup)    # 参考文献
+        self.ref.get_contents(self.soup)     # 参考文献
         self.appen.get_contents(self.soup)   # 附录
-        self.record.get_contents(self.soup)    # 修改记录
-        self.thanks = get_thanks(self.soup)    # 致谢
+        self.record.get_contents(self.soup)  # 修改记录
+        self.thanks.get_contents(self.soup)  # 致谢
 
     def compile(self):
         self.main.contents = get_index(self.main.contents)
@@ -620,15 +610,15 @@ class GraduationPaper(Paper):
         doc = docx.Document(doc_path)
         word.DM.set_doc(doc)
 
-        self.meta.render()   # metadata
-        self.abs.render()    # 摘要 Abstract
-        self.intro.render()  # 引言
-        self.main.render()  # 正文
-        self.conc.render()  # 结论
-        self.ref.render()  # 参考文献
-        self.appen.render()  # 附录
+        self.meta.render()    # metadata
+        self.abs.render()     # 摘要 Abstract
+        self.intro.render()   # 引言
+        self.main.render()    # 正文
+        self.conc.render()    # 结论
+        self.ref.render()     # 参考文献
+        self.appen.render()   # 附录
         self.record.render()  # 修改记录
-        self.thanks.render_template()  # 致谢
+        self.thanks.render()  # 致谢
 
         word.DM.update_toc()
         doc.save(out_path)
