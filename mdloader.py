@@ -96,10 +96,10 @@ def process_headline(head_counter: list[int], h_label: str, headline: str):
     headline = headline.strip()
     assert_warning(headline[:len(index)] == index,
                    "没有编号或者编号错误: {} {}".format(h_label, headline))
-    assert_warning(headline[len(index):len(index)+2] == "  " and
-                   headline[len(index)+2] != " ",
-                   "编号后应该有两个空格: {} {}".format(h_label, headline))
-    headline = headline[:len(index)+2] + rbk(headline[len(index)+2:])
+    assert_warning(headline[len(index)] == " " and
+                   headline[len(index)+1] != " ",
+                   "MD 中编号后应该有一个空格: {} {}".format(h_label, headline))
+    headline = headline[:len(index)] + "  " + rbk(headline[len(index)+1:])
 
     return head_counter, (h_label, headline)
 
@@ -533,8 +533,9 @@ class AppenPart(PaperPart):
             title = title[:2] + title[3:]
         assert_warning(title[2] == chr(ord("A") + index),
                        "附录应该以大写字母顺序编号: " + title)
-        assert_warning(title[3: 5] == "  ", "附录编号和标题间应该有两空格: " + title)
-        title = title[:5] + rbk(title[5:].strip())
+        assert_warning(title[3] == " " and title[4] != " ",
+                       "MD 中附录编号后应该有一个空格: " + title)
+        title = title[:3] + "  " + rbk(title[4:].strip())
         return title
 
 
