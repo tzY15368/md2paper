@@ -5,6 +5,8 @@ import re
 from functools import reduce
 import os
 import docx
+import bibtexparser
+from bibtexparser.bparser import BibTexParser
 
 from mdext import MDExt
 import md2paper as word
@@ -343,8 +345,9 @@ class PaperPart:
 
     # 处理与渲染
 
-    def check(self):
-        pass
+    def check(self): pass
+
+    def compile(self): pass
 
     def render(self):
         self._set_contents()
@@ -456,13 +459,142 @@ class ConcPart(PaperPart):
 
 
 class RefPart(PaperPart):
+    def __init__(self):
+        self.ref_map: dict[str, str] = {}
+        self.ref_item_list: list[str] = []
+
     def get_contents(self, soup: BeautifulSoup):
         reference_h1 = soup.find("h1", string=re.compile("参考文献"))
-        pass  # FIXME
+        until_h1 = until_h1 = soup.find("h1", string=re.compile("附录"))
+        if until_h1 == None:
+            until_h1 = soup.find("h1", string=re.compile("修改记录"))
+
+        self.bib_path = ""
+        refs: list[str] = []
+
+        cur = reference_h1.next_sibling
+        while cur != until_h1:
+            if cur.name != "p":
+                cur = cur.next_sibling
+                continue
+            for i in cur.children:
+                if i.name == "code":
+                    text = i.text.split("\n")
+                    if text[0] == "literature":
+                        refs += text[1:]
+                    elif text[0] == "bib":
+                        self.bib_path = text[1]
+                    else:
+                        log_error("这啥? " + i)
+            cur = cur.next_sibling
+
+        for ref_item in refs:
+            pos = ref_item.find("]")
+            assert_error(ref_item[0] == "[" and pos != -1,
+                         "参考文献条目应该以 `[索引]` 开头: " + ref_item)
+            ref = ref_item[1: pos]
+            item = ref_item[pos+1:].strip()
+            assert_warning(ref not in self.ref_map,
+                           "参考文献索引不能重复: " + ref_item)
+            self.ref_map[ref] = item
 
     def _set_contents(self):
         self.block = word.References()
         pass  # FIXME
+
+    def _ref_get_author(self, data: dict[str, str]) -> list[str]:
+        if data["langid"] == "english":
+            names = data["author"].split("and")
+            authors = []
+            for full_name in names:
+                full_name = full_name.split(',')
+                last_name = full_name[0].strip()
+                name = full_name[1].strip().split(" ")
+                name = [x[0] for x in name]
+                name = reduce(lambda x, y: x+" "+y, name)
+                sort_name = "{} {}".format(last_name, name)
+                authors.append(sort_name)
+            if len(authors) > 3:
+                authors = authors[:3]
+                authors.append("et al")
+            author = reduce(lambda x, y: x+", "+y, authors)
+        elif data["langid"] == "chinese":
+            names = data["author"].split("and")
+            authors = []
+            for full_name in names:
+                full_name = full_name.split(',')
+                last_name = full_name[0].strip()
+                name = full_name[1].strip()
+                sort_name = "{}{}".format(last_name, name)
+                authors.append(sort_name)
+            if len(authors) > 3:
+                authors = authors[:3]
+                authors.append("等")
+            author = reduce(lambda x, y: x+", "+y, authors)
+        else:
+            log_error("没做"+str(data))
+        return author
+
+    def _ref_get_entrytype(self, data: dict[str, str]) -> str:
+        type_map = {"book": "M",
+                    "inproceedings": "C",
+                    "": "G",
+                    "": "N",
+                    "article": "J",
+                    "phdthesis": "D",
+                    "techreport": "R",
+                    "misc": "S",
+                    "patent": "P",
+                    "": "DB",
+                    "": "CP",
+                    "": "EB",
+                    }
+        return type_map[data["ENTRYTYPE"]]
+
+    def _ref_get_back(self, data: dict[str, str]) -> str:
+        back = ""
+        if "address" in data and "publisher" in data:
+            address = data["address"].replace("{", "").replace("}", "")
+            publisher = data["publisher"].replace("{", "").replace("}", "")
+            back = "{}: {}, ".format(address, publisher)
+        return back
+
+    def _ref_GB_T_7714_2005(self, data: dict[str, str]) -> str:
+        assert_error("langid" in data, "参考文献应该有语言信息: "+str(data))
+        langid = data["langid"]
+        author = self._ref_get_author(data)
+        title = data["title"].replace("{", "").replace("}", "")
+        entrytype = self._ref_get_entrytype(data)
+        year = data["year"].replace("{", "").replace("}", "")
+        back = self._ref_get_back(data)
+
+        if langid == "english":
+            ref_item = "{}. {} [{}]. {}{}.".format(
+                author, title, entrytype, back, year)
+        elif langid == "chinese":
+            ref_item = "{}. {}[{}]. {}{}.".format(
+                author, title, entrytype, back, year)
+        else:
+            log_error("没做"+str(data))
+        return ref_item
+
+    def _load_bib(self) -> dict[str, str]:
+        if self.bib_path == "":
+            return {}
+        with open(self.bib_path) as bibtex_file:
+            parser = BibTexParser(common_strings=True)
+            bib_database = bibtexparser.load(bibtex_file, parser=parser)
+        ref_map = {}
+        for item in bib_database.entries:
+            ref_map["@"+item["ID"]] = self._ref_GB_T_7714_2005(item)
+        return ref_map
+
+    def compile(self):
+        ref_map = self._load_bib()
+        for ref in ref_map:
+            assert_warning(ref not in self.ref_map,
+                           "参考文献索引不能重复: " + ref)
+            self.ref_map[ref] = ref_map[ref]
 
 
 class AppenPart(PaperPart):
@@ -521,6 +653,9 @@ class ThanksPart(PaperPart):
 
 
 class Paper:
+    def __init__(self):
+        self.parts: list[PaperPart]
+
     def load_md(self, md_path: str):
         with open(md_path, "r") as f:
             md_file = f.read()
@@ -538,11 +673,23 @@ class Paper:
             with open("out.html", "w") as f:
                 f.write(self.soup.prettify())
 
-    def get_contents(self) -> None: pass
+    def get_contents(self):
+        for part in self.parts:
+            part.get_contents(self.soup)
 
-    def compile(self) -> None: pass
+    def compile(self):
+        for part in self.parts:
+            part.compile()
 
-    def render(self, doc_path: str, out_path: str) -> None: pass
+    def render(self, doc_path: str, out_path: str):
+        doc = docx.Document(doc_path)
+        word.DM.set_doc(doc)
+
+        for part in self.parts:
+            part.render()
+
+        word.DM.update_toc()
+        doc.save(out_path)
 
 
 class GraduationPaper(Paper):
@@ -569,25 +716,13 @@ class GraduationPaper(Paper):
             self.thanks
         ]
 
-    def get_contents(self):
-        for part in self.parts:
-            part.get_contents(self.soup)
-
     def compile(self):
+        super().compile()
+
         self.abs.title_zh_CN = self.meta.title_zh_CN
         self.abs.title_en = self.meta.title_en
 
         self.main.contents = get_index(self.main.contents)
-
-    def render(self, doc_path: str, out_path: str):
-        doc = docx.Document(doc_path)
-        word.DM.set_doc(doc)
-
-        for part in self.parts:
-            part.render()
-
-        word.DM.update_toc()
-        doc.save(out_path)
 
 
 if __name__ == "__main__":
