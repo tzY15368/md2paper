@@ -393,9 +393,10 @@ class AbsPart(PaperPart):
         conts_cn = self._get_content_until(abs_cn_h1.next_sibling, abs_cn_ul)
         assert_warning(conts_cn[-1] == ("p", [{"type": "text", "text": "关键词："}]),
                        '摘要应该以"关键词："后接关键词列表结尾')
-        self.conts_cn = conts_cn[:-1]
-        self.keywords_cn = [rbk(i.text)
-                            for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]
+        self.conts_zh_CN = conts_cn[:-1]
+        self.keywords_zh_CN = [rbk(i.text)
+                               for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]
+        self.title_zh_CN = ""
 
         # Abstract
         abs_en_h1 = soup.find("h1", string=re.compile("Abstract"))
@@ -406,12 +407,15 @@ class AbsPart(PaperPart):
         self.conts_en = conts_en[:-1]
         self.keywords_en = [rbk(i.text)
                             for i in abs_en_h1.find_next_sibling("ul").find_all("li")]
+        self.title_en = ""
 
     def _set_contents(self):
         self.block = word.Abstract()
-        self.block.add_text(assemble_ps(self.conts_cn),
+        self.block.set_title(self.title_zh_CN,
+                             self.title_en)
+        self.block.add_text(assemble_ps(self.conts_zh_CN),
                             assemble_ps(self.conts_en))
-        self.block.set_keyword(self.keywords_cn,
+        self.block.set_keyword(self.keywords_zh_CN,
                                self.keywords_en)
 
 
@@ -570,6 +574,9 @@ class GraduationPaper(Paper):
             part.get_contents(self.soup)
 
     def compile(self):
+        self.abs.title_zh_CN = self.meta.title_zh_CN
+        self.abs.title_en = self.meta.title_en
+
         self.main.contents = get_index(self.main.contents)
 
     def render(self, doc_path: str, out_path: str):
