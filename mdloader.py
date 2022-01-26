@@ -5,7 +5,6 @@ import re
 from functools import reduce
 import os
 import docx
-from docx import Document
 
 from mdext import MDExt
 import md2paper as word
@@ -73,222 +72,6 @@ def split_title(title):
     ali = title.split(':')[0]
     title = rbk(title[len(ali)+1:].strip())
     return ali, title
-
-
-# 处理标签
-
-def process_headline(head_counter: list[int], h_label: str, headline: str):
-    level = int(h_label[1:])
-    assert_warning(1 <= level and level <= len(head_counter)+1,
-                   "标题层级应该递进" + headline)
-    if level == len(head_counter) + 1:  # new sub part
-        head_counter.append(1)
-    elif 1 <= level and level <= len(head_counter):  # new part
-        head_counter[level-1] += 1
-        head_counter = head_counter[:level]
-    else:
-        log_error("错误的标题编号")
-
-    index = str(head_counter[0])
-    for i in range(1, len(head_counter)):
-        index += "." + str(head_counter[i])
-
-    headline = headline.strip()
-    assert_warning(headline[:len(index)] == index,
-                   "没有编号或者编号错误: {} {}".format(h_label, headline))
-    assert_warning(headline[len(index)] == " " and
-                   headline[len(index)+1] != " ",
-                   "MD 中编号后应该有一个空格: {} {}".format(h_label, headline))
-    headline = headline[:len(index)] + "  " + rbk(headline[len(index)+1:])
-
-    return head_counter, (h_label, headline)
-
-
-def process_ps(p, ollevel=4):
-    ps = []
-    data = []
-    for i in p.children:
-        if i.name == None:
-            if i.text == "\n":
-                continue
-            data.append({"type": "text", "text": rbk(i.text)})
-        elif i.name == "strong":
-            assert_warning(len(i.contents) == 1, "只允许粗斜体，不允许复杂嵌套")
-            if i.contents[0].name == "em":
-                data.append({"type": "strong-em", "text": rbk(i.text)})
-            else:
-                data.append({"type": "strong", "text": rbk(i.text)})
-        elif i.name == "em":
-            data.append({"type": "em", "text": rbk(i.text)})
-        elif i.name == "math-inline":
-            data.append({"type": "math-inline", "text": i.text})
-        elif i.name == "ref":
-            data.append({"type": "ref", "text": rbk(i.text.strip())})
-        else:  # 需要分段
-            if data:
-                ps.append(("p", data))
-                data = []
-            if i.name == "br":  # 分段
-                pass
-            elif i.name == "img":  # 图片
-                ps.append(process_img(i))
-            elif i.name == "ol":
-                ps += process_ol(i, ollevel)
-            else:
-                log_error("缺了什么？" + str(i))
-    if data:
-        ps.append(("p", data))
-    return ps
-
-
-def process_img(img):
-    global file_dir
-    img_path = os.path.join(file_dir, img["src"])
-    ali, title = split_title(img["alt"])
-    return ("img", {"alias": ali,
-                    "title": title,
-                    "src": img_path})
-
-
-def process_table(title, table):
-    data = []
-    # 表头，有上实线
-    data.append(word.Row([rbk(i.text) for i in table.find("thead").find_all("th")],
-                         top_border=True))
-    has_border = True  # 表身第一行有上实线
-    for tr in table.find("tbody").find_all("tr"):
-        row = [rbk(i.text) for i in tr.find_all("td")]  # get all text
-        row = list(map(lambda x: None if x == '' else x,
-                       row))  # replace '' with None
-        if has_border:
-            data.append(word.Row(row, top_border=True))
-            has_border = False
-        else:
-            is_border = True
-            for i in row:
-                if i == None:
-                    is_border = False
-                    break
-                for j in i:
-                    if j != '-':
-                        is_border = False
-                        break
-            if is_border:
-                has_border = True  # 自定义的实线，下一行数据有上实线
-            else:
-                data.append(word.Row(row))
-
-    ali, title = split_title(title)
-    return ("table", {"alias": ali,
-                      "title": title,
-                      "data": data})
-
-
-def process_lis(li, level):
-    if (li.contents[0].text == "\n"):  # <p>
-        conts = get_content_from(li.contents[0], level+1)
-    else:  # text
-        conts = process_ps(li, level+1)
-    conts[0] = ("fh" + str(level), conts[0][1])
-    return conts
-
-
-def process_ol(ol, level):
-    assert_error(level <= 5, "层次至多两层")
-    datas = [process_lis(i, level)
-             for i in ol.find_all("li", recursive=False)]
-    # make index
-    for i in range(len(datas)):
-        li_data = datas[i][0]
-        if level == 4:
-            li_data[1].insert(
-                0, {"type": "text", "text": "（{}） ".format(i+1)})
-        else:
-            assert_warning(i < 20, "层次二不能超过 20 项")
-            li_data[1].insert(
-                0, {"type": "text", "text": "{} ".format(chr(i+0x2460))})  # get ①②..⑳
-    data = reduce(lambda x, y: x + y, datas)
-    return data
-
-
-def process_math(title, math):
-    return ("math", {"alias": title,
-                     "title": "",
-                     "text": math.text})
-
-
-# 提取内容
-
-def get_content_until(cur, until, ollevel=4):
-    conts = []
-    head_counter = [0]
-    while cur != until:
-        if cur.name == None:
-            cur = cur.next_sibling
-            continue
-        if cur.name[0] == "h":  # h1 h2 h3
-            head_counter, pair = process_headline(head_counter,
-                                                  cur.name, cur.text)
-            conts.append(pair)
-        elif cur.name == "p":
-            conts += process_ps(cur)
-        elif cur.name == "table":
-            table_name = raw_text(conts[-1][1])
-            conts = conts[:-1]
-            conts.append(process_table(table_name, cur))
-        elif cur.name == "ol":
-            conts += process_ol(cur, ollevel)
-        elif cur.name == "math":
-            math_title = raw_text(conts[-1][1])
-            conts = conts[:-1]
-            conts.append(process_math(math_title, cur))
-        else:
-            log_error("这是啥？" + cur.prettify())
-        cur = cur.next_sibling
-    return conts
-
-
-def get_content_from(cur, ollevel=4):
-    return get_content_until(cur, None, ollevel)
-
-
-def set_content(cont_block, conts):
-    for (name, cont) in conts:
-        if name == "h1":
-            cont_block.add_chapter(cont)
-        elif name == "h2":
-            cont_block.add_section(cont)
-        elif name == "h3":
-            cont_block.add_subsection(cont)
-        elif name in ["p", "fh4", "fh5"]:
-            if not debug:
-                para = cont_block.add_text("")
-            else:
-                para = cont_block.add_text(name)
-            for run in cont:
-                if run["type"] == "text":
-                    para.add_run(word.Run(run["text"], word.Run.normal))
-                elif run["type"] == "strong":
-                    para.add_run(word.Run(run["text"], word.Run.bold))
-                elif run["type"] == "em":
-                    para.add_run(word.Run(run["text"], word.Run.italics))
-                elif run["type"] == "strong-em":
-                    para.add_run(word.Run(run["text"],
-                                          word.Run.italics | word.Run.bold))
-                elif run["type"] == "math-inline":
-                    para.add_run(word.Run(run["text"], word.Run.formula))
-                elif run["type"] == "ref":
-                    para.add_run(word.Run(run["text"], word.Run.normal))
-                else:
-                    print("还没实现now", name)
-        elif name == "img":
-            cont_block.add_image([word.ImageData(cont["src"], cont["title"])])
-        elif name == "table":
-            cont_block.add_table(cont['title'], cont['data'])
-        elif name == "math":
-            cont_block.add_formula(cont['title'], cont['text'])
-        else:
-            print("还没实现now", name)
 
 
 # 索引处理
@@ -388,6 +171,178 @@ class PaperPart:
     def _set_contents(self):
         self._set_body()
 
+    # 获取内容
+
+    def get_contents(self, soup: BeautifulSoup): pass
+
+    def _get_content_until(self, cur, until, ollevel=4):
+        conts = []
+        head_counter = [0]
+        while cur != until:
+            if cur.name == None:
+                cur = cur.next_sibling
+                continue
+            if cur.name[0] == "h":  # h1 h2 h3
+                head_counter, pair = self._process_headline(head_counter,
+                                                            cur.name, cur.text)
+                conts.append(pair)
+            elif cur.name == "p":
+                conts += self._process_ps(cur)
+            elif cur.name == "table":
+                table_name = raw_text(conts[-1][1])
+                conts = conts[:-1]
+                conts.append(self._process_table(table_name, cur))
+            elif cur.name == "ol":
+                conts += self._process_ol(cur, ollevel)
+            elif cur.name == "math":
+                math_title = raw_text(conts[-1][1])
+                conts = conts[:-1]
+                conts.append(self._process_math(math_title, cur))
+            else:
+                log_error("这是啥？" + cur.prettify())
+            cur = cur.next_sibling
+        return conts
+
+    def _get_content_from(self, cur, ollevel=4):
+        return self._get_content_until(cur, None, ollevel)
+
+    # 处理标签
+
+    def _process_headline(self, head_counter: list[int], h_label: str, headline: str):
+        level = int(h_label[1:])
+        assert_warning(1 <= level and level <= len(head_counter)+1,
+                       "标题层级应该递进" + headline)
+        if level == len(head_counter) + 1:  # new sub part
+            head_counter.append(1)
+        elif 1 <= level and level <= len(head_counter):  # new part
+            head_counter[level-1] += 1
+            head_counter = head_counter[:level]
+        else:
+            log_error("错误的标题编号")
+
+        index = str(head_counter[0])
+        for i in range(1, len(head_counter)):
+            index += "." + str(head_counter[i])
+
+        headline = headline.strip()
+        assert_warning(headline[:len(index)] == index,
+                       "没有编号或者编号错误: {} {}".format(h_label, headline))
+        assert_warning(headline[len(index)] == " " and
+                       headline[len(index)+1] != " ",
+                       "MD 中编号后应该有一个空格: {} {}".format(h_label, headline))
+        headline = headline[:len(index)] + "  " + rbk(headline[len(index)+1:])
+
+        return head_counter, (h_label, headline)
+
+    def _process_ps(self, p, ollevel=4):
+        ps = []
+        data = []
+        for i in p.children:
+            if i.name == None:
+                if i.text == "\n":
+                    continue
+                data.append({"type": "text", "text": rbk(i.text)})
+            elif i.name == "strong":
+                assert_warning(len(i.contents) == 1, "只允许粗斜体，不允许复杂嵌套")
+                if i.contents[0].name == "em":
+                    data.append({"type": "strong-em", "text": rbk(i.text)})
+                else:
+                    data.append({"type": "strong", "text": rbk(i.text)})
+            elif i.name == "em":
+                data.append({"type": "em", "text": rbk(i.text)})
+            elif i.name == "math-inline":
+                data.append({"type": "math-inline", "text": i.text})
+            elif i.name == "ref":
+                data.append({"type": "ref", "text": rbk(i.text.strip())})
+            else:  # 需要分段
+                if data:
+                    ps.append(("p", data))
+                    data = []
+                if i.name == "br":  # 分段
+                    pass
+                elif i.name == "img":  # 图片
+                    ps.append(self._process_img(i))
+                elif i.name == "ol":
+                    ps += self._process_ol(i, ollevel)
+                else:
+                    log_error("缺了什么？" + str(i))
+        if data:
+            ps.append(("p", data))
+        return ps
+
+    def _process_img(self, img):
+        global file_dir
+        img_path = os.path.join(file_dir, img["src"])
+        ali, title = split_title(img["alt"])
+        return ("img", {"alias": ali,
+                        "title": title,
+                        "src": img_path})
+
+    def _process_table(self, title, table):
+        data = []
+        # 表头，有上实线
+        data.append(word.Row([rbk(i.text) for i in table.find("thead").find_all("th")],
+                             top_border=True))
+        has_border = True  # 表身第一行有上实线
+        for tr in table.find("tbody").find_all("tr"):
+            row = [rbk(i.text) for i in tr.find_all("td")]  # get all text
+            row = list(map(lambda x: None if x == '' else x,
+                           row))  # replace '' with None
+            if has_border:
+                data.append(word.Row(row, top_border=True))
+                has_border = False
+            else:
+                is_border = True
+                for i in row:
+                    if i == None:
+                        is_border = False
+                        break
+                    for j in i:
+                        if j != '-':
+                            is_border = False
+                            break
+                if is_border:
+                    has_border = True  # 自定义的实线，下一行数据有上实线
+                else:
+                    data.append(word.Row(row))
+
+        ali, title = split_title(title)
+        return ("table", {"alias": ali,
+                          "title": title,
+                          "data": data})
+
+    def _process_lis(self, li, level):
+        if (li.contents[0].text == "\n"):  # <p>
+            conts = self._get_content_from(li.contents[0], level+1)
+        else:  # text
+            conts = self._process_ps(li, level+1)
+        conts[0] = ("fh" + str(level), conts[0][1])
+        return conts
+
+    def _process_ol(self, ol, level):
+        assert_error(level <= 5, "层次至多两层")
+        datas = [self._process_lis(i, level)
+                 for i in ol.find_all("li", recursive=False)]
+        # make index
+        for i in range(len(datas)):
+            li_data = datas[i][0]
+            if level == 4:
+                li_data[1].insert(
+                    0, {"type": "text", "text": "（{}） ".format(i+1)})
+            else:
+                assert_warning(i < 20, "层次二不能超过 20 项")
+                li_data[1].insert(
+                    0, {"type": "text", "text": "{} ".format(chr(i+0x2460))})  # get ①②..⑳
+        data = reduce(lambda x, y: x + y, datas)
+        return data
+
+    def _process_math(self, title, math):
+        return ("math", {"alias": title,
+                         "title": "",
+                         "text": math.text})
+
+    # 处理与渲染
+
     def check(self):
         pass
 
@@ -435,7 +390,7 @@ class AbsPart(PaperPart):
         # 摘要
         abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
         abs_cn_ul = abs_cn_h1.find_next_sibling("ul")
-        conts_cn = get_content_until(abs_cn_h1.next_sibling, abs_cn_ul)
+        conts_cn = self._get_content_until(abs_cn_h1.next_sibling, abs_cn_ul)
         assert_warning(conts_cn[-1] == ("p", [{"type": "text", "text": "关键词："}]),
                        '摘要应该以"关键词："后接关键词列表结尾')
         self.conts_cn = conts_cn[:-1]
@@ -445,7 +400,7 @@ class AbsPart(PaperPart):
         # Abstract
         abs_en_h1 = soup.find("h1", string=re.compile("Abstract"))
         abs_en_ul = abs_en_h1.find_next_sibling("ul")
-        conts_en = get_content_until(abs_en_h1.next_sibling, abs_en_ul)
+        conts_en = self._get_content_until(abs_en_h1.next_sibling, abs_en_ul)
         assert_warning(conts_en[-1] == ("p", [{"type": "text", "text": "Key Words:"}]),
                        'Abstract应该以"Key Words:"后接关键词列表结尾')
         self.conts_en = conts_en[:-1]
@@ -463,8 +418,8 @@ class AbsPart(PaperPart):
 class IntroPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         intro_h1 = soup.find("h1", string=re.compile("引言"))
-        conts = get_content_until(intro_h1.next_sibling,
-                                  soup.find("h1", string=re.compile("正文")))
+        conts = self._get_content_until(intro_h1.next_sibling,
+                                        soup.find("h1", string=re.compile("正文")))
         self.contents = conts
 
     def _set_contents(self):
@@ -475,8 +430,8 @@ class IntroPart(PaperPart):
 class MainPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         main_h1 = soup.find("h1", string=re.compile("正文"))
-        conts = get_content_until(main_h1.next_sibling,
-                                  soup.find("h1", string=re.compile("结论")))
+        conts = self._get_content_until(main_h1.next_sibling,
+                                        soup.find("h1", string=re.compile("结论")))
         self.contents = conts
 
     def _set_contents(self):
@@ -487,8 +442,8 @@ class MainPart(PaperPart):
 class ConcPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         conclusion_h1 = soup.find("h1", string=re.compile("结论"))
-        conts = get_content_until(conclusion_h1.next_sibling,
-                                  soup.find("h1", string=re.compile("参考文献")))
+        conts = self._get_content_until(conclusion_h1.next_sibling,
+                                        soup.find("h1", string=re.compile("参考文献")))
         self.contents = conts
 
     def _set_contents(self):
@@ -517,8 +472,8 @@ class AppenPart(PaperPart):
         appendix_h1s.append(soup.find("h1", string=re.compile("修改记录")))
         appens = []
         for i in range(0, len(appendix_h1s)-1):
-            conts = get_content_until(appendix_h1s[i].next_sibling,
-                                      appendix_h1s[i+1])
+            conts = self._get_content_until(appendix_h1s[i].next_sibling,
+                                            appendix_h1s[i+1])
             title = self._process_title(appendix_h1s[i].text, i)
             appens.append(self.AppenOne(title, conts))
         self.appens = appens
@@ -542,8 +497,8 @@ class AppenPart(PaperPart):
 class RecordPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         mod_record_h1 = soup.find("h1", string=re.compile("修改记录"))
-        conts = get_content_until(mod_record_h1.next_sibling,
-                                  soup.find("h1", string=re.compile("致谢")))
+        conts = self._get_content_until(mod_record_h1.next_sibling,
+                                        soup.find("h1", string=re.compile("致谢")))
         self.contents = conts
 
     def _set_contents(self):
@@ -554,7 +509,7 @@ class RecordPart(PaperPart):
 class ThanksPart(PaperPart):
     def get_contents(self, soup: BeautifulSoup):
         thanks_h1 = soup.find("h1", string=re.compile("致谢"))
-        self.contents = get_content_from(thanks_h1.next_sibling)
+        self.contents = self._get_content_from(thanks_h1.next_sibling)
 
     def _set_contents(self):
         self.block = word.Acknowledgments()
@@ -579,6 +534,12 @@ class Paper:
             with open("out.html", "w") as f:
                 f.write(self.soup.prettify())
 
+    def get_contents(self) -> None: pass
+
+    def compile(self) -> None: pass
+
+    def render(self, doc_path: str, out_path: str) -> None: pass
+
 
 class GraduationPaper(Paper):
     def __init__(self):
@@ -592,17 +553,21 @@ class GraduationPaper(Paper):
         self.record = RecordPart()
         self.thanks = ThanksPart()
 
+        self.parts: list[PaperPart] = [
+            self.meta,
+            self.abs,
+            self.intro,
+            self.main,
+            self.conc,
+            self.ref,
+            self.appen,
+            self.record,
+            self.thanks
+        ]
+
     def get_contents(self):
-        self.meta.get_contents(self.soup)    # metadata
-        self.abs.get_contents(self.soup)     # 摘要 Abstract
-        # 目录 pass
-        self.intro.get_contents(self.soup)   # 引言
-        self.main.get_contents(self.soup)    # 正文
-        self.conc.get_contents(self.soup)    # 结论
-        self.ref.get_contents(self.soup)     # 参考文献
-        self.appen.get_contents(self.soup)   # 附录
-        self.record.get_contents(self.soup)  # 修改记录
-        self.thanks.get_contents(self.soup)  # 致谢
+        for part in self.parts:
+            part.get_contents(self.soup)
 
     def compile(self):
         self.main.contents = get_index(self.main.contents)
@@ -611,15 +576,8 @@ class GraduationPaper(Paper):
         doc = docx.Document(doc_path)
         word.DM.set_doc(doc)
 
-        self.meta.render()    # metadata
-        self.abs.render()     # 摘要 Abstract
-        self.intro.render()   # 引言
-        self.main.render()    # 正文
-        self.conc.render()    # 结论
-        self.ref.render()     # 参考文献
-        self.appen.render()   # 附录
-        self.record.render()  # 修改记录
-        self.thanks.render()  # 致谢
+        for part in self.parts:
+            part.render()
 
         word.DM.update_toc()
         doc.save(out_path)
