@@ -131,51 +131,9 @@ class PaperPart:
         self.contents = []
         self.block: word.Component = None
 
-    def _set_body(self):
-        for (name, cont) in self.contents:
-            if name == "h1":
-                self.block.add_chapter(cont)
-            elif name == "h2":
-                self.block.add_section(cont)
-            elif name == "h3":
-                self.block.add_subsection(cont)
-            elif name in ["p", "fh4", "fh5"]:
-                if not debug:
-                    para = self.block.add_text("")
-                else:
-                    para = self.block.add_text(name)
-                for run in cont:
-                    if run["type"] == "text":
-                        para.add_run(word.Run(run["text"], word.Run.Normal))
-                    elif run["type"] == "strong":
-                        para.add_run(word.Run(run["text"], word.Run.Bold))
-                    elif run["type"] == "em":
-                        para.add_run(word.Run(run["text"], word.Run.Italics))
-                    elif run["type"] == "strong-em":
-                        para.add_run(word.Run(run["text"],
-                                              word.Run.Italics | word.Run.Bold))
-                    elif run["type"] == "math-inline":
-                        para.add_run(word.Run(run["text"], word.Run.Formula))
-                    elif run["type"] == "ref":
-                        para.add_run(word.Run(run["text"], word.Run.Normal))
-                    else:
-                        print("还没实现now", name)
-            elif name == "img":
-                self.block.add_image(
-                    [word.ImageData(cont["src"], cont["title"])])
-            elif name == "table":
-                self.block.add_table(cont['title'], cont['data'])
-            elif name == "math":
-                self.block.add_formula(cont['title'], cont['text'])
-            else:
-                print("还没实现now", name)
-
-    def _set_contents(self):
-        self._set_body()
-
     # 获取内容
 
-    def get_contents(self, soup: BeautifulSoup): pass
+    def load_contents(self, soup: BeautifulSoup): pass
 
     def _get_content_until(self, cur, until, ollevel=4):
         conts = []
@@ -343,19 +301,63 @@ class PaperPart:
                          "title": "",
                          "text": math.text})
 
-    # 处理与渲染
+    # 处理
 
     def check(self): pass
 
     def compile(self): pass
 
+    # 渲染
+
+    def _block_load_body(self):
+        for (name, cont) in self.contents:
+            if name == "h1":
+                self.block.add_chapter(cont)
+            elif name == "h2":
+                self.block.add_section(cont)
+            elif name == "h3":
+                self.block.add_subsection(cont)
+            elif name in ["p", "fh4", "fh5"]:
+                if not debug:
+                    para = self.block.add_text("")
+                else:
+                    para = self.block.add_text(name)
+                for run in cont:
+                    if run["type"] == "text":
+                        para.add_run(word.Run(run["text"], word.Run.Normal))
+                    elif run["type"] == "strong":
+                        para.add_run(word.Run(run["text"], word.Run.Bold))
+                    elif run["type"] == "em":
+                        para.add_run(word.Run(run["text"], word.Run.Italics))
+                    elif run["type"] == "strong-em":
+                        para.add_run(word.Run(run["text"],
+                                              word.Run.Italics | word.Run.Bold))
+                    elif run["type"] == "math-inline":
+                        para.add_run(word.Run(run["text"], word.Run.Formula))
+                    elif run["type"] == "ref":
+                        para.add_run(word.Run(run["text"], word.Run.Normal))
+                    else:
+                        print("还没实现now", name)
+            elif name == "img":
+                self.block.add_image(
+                    [word.ImageData(cont["src"], cont["title"])])
+            elif name == "table":
+                self.block.add_table(cont['title'], cont['data'])
+            elif name == "math":
+                self.block.add_formula(cont['title'], cont['text'])
+            else:
+                print("还没实现now", name)
+
+    def _block_load_contents(self):
+        self._block_load_body()
+
     def render(self):
-        self._set_contents()
+        self._block_load_contents()
         self.block.render_template()
 
 
 class MetaPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         mete_h1 = soup.find("h1")
 
         data_table = mete_h1.find_next_sibling("table").find("tbody")
@@ -374,7 +376,7 @@ class MetaPart(PaperPart):
         self.auditor = data_dict["评阅教师"]
         self.finish_date = data_dict["完成日期"]
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.Metadata()
 
         self.block.title_zh_CN = self.title_zh_CN
@@ -389,7 +391,7 @@ class MetaPart(PaperPart):
 
 
 class AbsPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         # 摘要
         abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
         abs_cn_ul = abs_cn_h1.find_next_sibling("ul")
@@ -412,7 +414,7 @@ class AbsPart(PaperPart):
                             for i in abs_en_h1.find_next_sibling("ul").find_all("li")]
         self.title_en = ""
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.Abstract()
         self.block.set_title(self.title_zh_CN,
                              self.title_en)
@@ -423,37 +425,37 @@ class AbsPart(PaperPart):
 
 
 class IntroPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         intro_h1 = soup.find("h1", string=re.compile("引言"))
         conts = self._get_content_until(intro_h1.next_sibling,
                                         soup.find("h1", string=re.compile("正文")))
         self.contents = conts
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.Introduction()
         self.block.add_text(assemble_ps(self.contents))
 
 
 class MainPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         main_h1 = soup.find("h1", string=re.compile("正文"))
         conts = self._get_content_until(main_h1.next_sibling,
                                         soup.find("h1", string=re.compile("结论")))
         self.contents = conts
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.MainContent()
-        self._set_body()
+        self._block_load_body()
 
 
 class ConcPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         conclusion_h1 = soup.find("h1", string=re.compile("结论"))
         conts = self._get_content_until(conclusion_h1.next_sibling,
                                         soup.find("h1", string=re.compile("参考文献")))
         self.contents = conts
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.Conclusion()
         self.block.add_text(assemble_ps(self.contents))
 
@@ -463,7 +465,7 @@ class RefPart(PaperPart):
         self.ref_map: dict[str, str] = {}
         self.ref_item_list: list[str] = []
 
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         reference_h1 = soup.find("h1", string=re.compile("参考文献"))
         until_h1 = until_h1 = soup.find("h1", string=re.compile("附录"))
         if until_h1 == None:
@@ -498,7 +500,7 @@ class RefPart(PaperPart):
                            "参考文献索引不能重复: " + ref_item)
             self.ref_map[ref] = item
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.References()
         pass  # FIXME
 
@@ -603,7 +605,7 @@ class AppenPart(PaperPart):
             self.title = title
             self.contents = conts
 
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
         appendix_h1s.append(soup.find("h1", string=re.compile("修改记录")))
         appens = []
@@ -614,7 +616,7 @@ class AppenPart(PaperPart):
             appens.append(self.AppenOne(title, conts))
         self.appens = appens
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.Appendixes()
         # FIXME
 
@@ -631,23 +633,23 @@ class AppenPart(PaperPart):
 
 
 class RecordPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         mod_record_h1 = soup.find("h1", string=re.compile("修改记录"))
         conts = self._get_content_until(mod_record_h1.next_sibling,
                                         soup.find("h1", string=re.compile("致谢")))
         self.contents = conts
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.ChangeRecord()
-        # self._set_body() # FIXME
+        # self._block_load_body() # FIXME
 
 
 class ThanksPart(PaperPart):
-    def get_contents(self, soup: BeautifulSoup):
+    def load_contents(self, soup: BeautifulSoup):
         thanks_h1 = soup.find("h1", string=re.compile("致谢"))
         self.contents = self._get_content_from(thanks_h1.next_sibling)
 
-    def _set_contents(self):
+    def _block_load_contents(self):
         self.block = word.Acknowledgments()
         self.block.add_text(assemble_ps(self.contents))
 
@@ -673,9 +675,9 @@ class Paper:
             with open("out.html", "w") as f:
                 f.write(self.soup.prettify())
 
-    def get_contents(self):
+    def load_contents(self):
         for part in self.parts:
-            part.get_contents(self.soup)
+            part.load_contents(self.soup)
 
     def compile(self):
         for part in self.parts:
@@ -728,7 +730,7 @@ class GraduationPaper(Paper):
 if __name__ == "__main__":
     paper = GraduationPaper()
     paper.load_md("论文模板.md")
-    paper.get_contents()
+    paper.load_contents()
     paper.compile()
 
     paper.render("毕业设计（论文）模板-docx.docx", "out.docx")
