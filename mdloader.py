@@ -34,6 +34,10 @@ def log_error(s: str):
     return assert_error(False, s)
 
 
+def log_warning(s: str):
+    return assert_warning(False, s)
+
+
 # 处理文本
 
 def rbk(text: str):  # remove_blank
@@ -76,52 +80,28 @@ def split_title(title):
     return ali, title
 
 
-# 索引处理
+def ref_items_list_unfold(ref_items_list: list):
+    unfold_ref_items = {}
+    for ref_items in ref_items_list:
+        for ali in ref_items:
+            assert_warning(ali not in unfold_ref_items,
+                           "任意类型的引用别名应该唯一: " + ali)
+            unfold_ref_items[ali] = ref_items[ali]
+    return unfold_ref_items
 
-def get_index(conts):
-    index_table = {}
-    text_table = {}
-    chapter_cnt = 0
 
-    for name, cont in conts:
-        if name == "h1":
-            chapter_cnt += 1
-            img_cnt = 0
-            table_cnt = 0
-            formula_cnt = 0
-        elif name in ["img", "table", "math"]:
-            ali = cont['alias']
-            assert_warning(ali not in index_table, "有重复别名" + ali)
-            if name == "img":
-                img_cnt += 1
-                index_table[ali] = "{}.{}".format(chapter_cnt, img_cnt)
-                text_table[ali] = "图{}.{}".format(chapter_cnt, img_cnt)
-                cont['title'] = "图{}  {}".format(
-                    index_table[ali], cont['title'])
-            elif name == "table":
-                table_cnt += 1
-                index_table[ali] = "{}.{}".format(chapter_cnt, table_cnt)
-                text_table[ali] = "表{}.{}".format(chapter_cnt, table_cnt)
-                cont['title'] = "表{}  {}".format(
-                    index_table[ali], cont['title'])
-            elif name == "math":
-                formula_cnt += 1
-                index_table[ali] = "{}.{}".format(chapter_cnt, formula_cnt)
-                text_table[ali] = "式{}.{}".format(chapter_cnt, formula_cnt)
-                cont['title'] = "（{}）".format(index_table[ali])
+# 数据类型
 
-    for name, cont in conts:
-        if name not in ["p", "fh4", "fh5"]:
-            continue
-        for run in cont:
-            if run["type"] != "ref":
-                continue
-            if run["text"] in text_table:
-                run["text"] = text_table[run["text"]]
-            else:
-                print("未知ref: " + run["text"])
+class RefItem:
+    IMG = "img"
+    TABLE = "Table"
+    MATH = "math"
+    LITER = "literature"
 
-    return conts
+    def __init__(self, index, text: str, type: str):
+        self.index = str(index)
+        self.text = text
+        self.type = type
 
 
 # 每个论文模块
@@ -307,6 +287,116 @@ class PaperPart:
 
     def compile(self): pass
 
+    def _get_ref_items(self, conts, index_prefix: str = "") -> dict[str, RefItem]:
+        def get_index(index_prefix: str, chapter_cnt: int, item_cnt: int):
+            if index_prefix == "":
+                return "{}.{}".format(chapter_cnt, item_cnt)
+            else:
+                return "{}{}".format(index_prefix, item_cnt)
+
+        def img_index() -> str:
+            return get_index(index_prefix, chapter_cnt, img_cnt)
+
+        def table_index() -> str:
+            return get_index(index_prefix, chapter_cnt, img_cnt)
+
+        def math_index() -> str:
+            return get_index(index_prefix, chapter_cnt, img_cnt)
+
+        ref_items = {}
+        chapter_cnt = 0
+
+        for name, cont in conts:
+            if name == "h1":
+                chapter_cnt += 1
+                img_cnt = 0
+                table_cnt = 0
+                formula_cnt = 0
+            elif name in ["img", "table", "math"]:
+                ali = cont['alias']
+                assert_warning(ali not in ref_items, "有重复别名" + ali)
+                if name == "img":
+                    img_cnt += 1
+                    ref_items[ali] = RefItem(
+                        img_index(), "图" + img_index(), RefItem.IMG)
+                    cont['title'] = "图{}  {}".format(
+                        img_index(), cont['title'])
+                elif name == "table":
+                    table_cnt += 1
+                    ref_items[ali] = RefItem(
+                        table_index(), "表" + table_index(), RefItem.TABLE)
+                    cont['title'] = "表{}  {}".format(
+                        table_index(), cont['title'])
+                elif name == "math":
+                    formula_cnt += 1
+                    ref_items[ali] = RefItem(
+                        math_index(), "式" + math_index(), RefItem.MATH)
+                    cont['title'] = "（{}）".format(
+                        table_index())
+        return ref_items
+
+    def get_ref_items(self):
+        return self._get_ref_items(self.contents)
+
+    def link_ref(self, ref_items: dict[str, RefItem], liter_cnt: int) -> int:
+        for name, cont in self.contents:
+            if name not in ["p", "fh4", "fh5"]:
+                continue
+            is_text = False
+            for run in cont:
+                if run["type"] != "ref":
+                    if run["type"] == "text" and run["text"].endswith("文献"):
+                        is_text = True
+                    continue
+                ali = run["text"]
+                if ali.find(",") == -1:
+                    if ali not in ref_items:
+                        ref_items[ali] = RefItem(
+                            liter_cnt+1, "", RefItem.LITER)
+                        liter_cnt += 1
+                    ref_item = ref_items[ali]
+                    if ref_item.type == RefItem.LITER:
+                        run["text"] = "[{}]".format(
+                            ref_item.index)
+                        if is_text:
+                            run["type"] = "text"
+                        else:
+                            run["type"] = "ref"
+                    else:
+                        run["type"] = "text"
+                        run["text"] = ref_item.text
+                else:
+                    alis = ali.split(",")
+                    for ali in alis:
+                        if ali not in ref_items:
+                            ref_items[ali] = RefItem(
+                                liter_cnt+1, "", RefItem.LITER)
+                            liter_cnt += 1
+                    index_list = []
+                    for ali in alis:
+                        assert_error(ref_items[ali].type == RefItem.LITER,
+                                     "只有参考文献可以一次引用多个: "+str(alis))
+                        index_list.append(int(ref_items[ali].index))
+                    index_list.sort()
+                    index_list = [[x, x] for x in index_list]
+                    sort_list = index_list[:1]
+                    for index_pair in index_list[1:]:
+                        if sort_list[-1][1]+1 == index_pair[0]:
+                            sort_list[-1][1] = index_pair[1]
+                        else:
+                            sort_list.append(index_pair)
+                    sort_list = [str(x[0]) if x[0] == x[1]
+                                 else "{}-{}".format(x[0], x[1])
+                                 for x in sort_list]
+                    run["text"] = "[{}]".format(
+                        reduce(lambda x, y: x+","+y, sort_list))
+                    if is_text:
+                        run["type"] = "text"
+                    else:
+                        run["type"] = "ref"
+                is_text = False
+        return liter_cnt
+
     # 渲染
 
     def _block_load_body(self):
@@ -462,8 +552,9 @@ class ConcPart(PaperPart):
 
 class RefPart(PaperPart):
     def __init__(self):
+        super().__init__()
         self.ref_map: dict[str, str] = {}
-        self.ref_item_list: list[str] = []
+        self.ref_list: list[str] = []
 
     def load_contents(self, soup: BeautifulSoup):
         reference_h1 = soup.find("h1", string=re.compile("参考文献"))
@@ -598,12 +689,29 @@ class RefPart(PaperPart):
                            "参考文献索引不能重复: " + ref)
             self.ref_map[ref] = ref_map[ref]
 
+    def filt_ref(self, ref_items: dict[str, RefItem]):
+        ali_list = [(int(ref_items[ali].index), ali)
+                    for ali in ref_items
+                    if ref_items[ali].type == RefItem.LITER]
+        ali_list.sort()
+        self.ref_list = []
+        for index, ali in ali_list:
+            assert_warning(ali in self.ref_map,
+                           "引用的文献应该在参考文献中出现: " + ali)
+            if ali in self.ref_map:
+                self.ref_list.append(
+                    "[{}] {}".format(index, self.ref_map[ali]))
+
 
 class AppenPart(PaperPart):
     class AppenOne:
         def __init__(self, title: str, conts):
             self.title = title
             self.contents = conts
+
+    def __init__(self):
+        super().__init__()
+        self.appens: list[self.AppenOne] = []
 
     def load_contents(self, soup: BeautifulSoup):
         appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
@@ -631,6 +739,11 @@ class AppenPart(PaperPart):
         title = title[:3] + "  " + rbk(title[4:].strip())
         return title
 
+    def get_ref_items(self):
+        ref_items_list = [self._get_ref_items(appen.contents, appen.title[2])
+                          for appen in self.appens]
+        return ref_items_list_unfold(ref_items_list)
+
 
 class RecordPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
@@ -657,6 +770,7 @@ class ThanksPart(PaperPart):
 class Paper:
     def __init__(self):
         self.parts: list[PaperPart]
+        self.ref_items: dict[str, dict[str, str]] = {}
 
     def load_md(self, md_path: str):
         with open(md_path, "r") as f:
@@ -724,7 +838,15 @@ class GraduationPaper(Paper):
         self.abs.title_zh_CN = self.meta.title_zh_CN
         self.abs.title_en = self.meta.title_en
 
-        self.main.contents = get_index(self.main.contents)
+        ref_items_list = [
+            self.main.get_ref_items(),
+            self.appen.get_ref_items()
+        ]
+        self.ref_items = ref_items_list_unfold(ref_items_list)
+        liter_cnt = 0
+        for part in self.parts:
+            liter_cnt = part.link_ref(self.ref_items, liter_cnt)
+        self.ref.filt_ref(self.ref_items)
 
 
 if __name__ == "__main__":
