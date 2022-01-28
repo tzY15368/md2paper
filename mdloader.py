@@ -7,6 +7,7 @@ import os
 import docx
 import bibtexparser
 from bibtexparser.bparser import BibTexParser
+from typing import Dict, List
 
 from mdext import MDExt
 import md2paper as word
@@ -148,7 +149,7 @@ class PaperPart:
 
     # 处理标签
 
-    def _process_headline(self, head_counter: list[int], h_label: str, headline: str):
+    def _process_headline(self, head_counter: List[int], h_label: str, headline: str):
         level = int(h_label[1:])
         assert_warning(1 <= level and level <= len(head_counter)+1,
                        "标题层级应该递进" + headline)
@@ -287,7 +288,7 @@ class PaperPart:
 
     def compile(self): pass
 
-    def _get_ref_items(self, conts, index_prefix: str = "") -> dict[str, RefItem]:
+    def _get_ref_items(self, conts, index_prefix: str = "") -> Dict[str, RefItem]:
         def get_index(index_prefix: str, chapter_cnt: int, item_cnt: int):
             if index_prefix == "":
                 return "{}.{}".format(chapter_cnt, item_cnt)
@@ -338,7 +339,7 @@ class PaperPart:
     def get_ref_items(self):
         return self._get_ref_items(self.contents)
 
-    def link_ref(self, ref_items: dict[str, RefItem], liter_cnt: int) -> int:
+    def link_ref(self, ref_items: Dict[str, RefItem], liter_cnt: int) -> int:
         for name, cont in self.contents:
             if name not in ["p", "fh4", "fh5"]:
                 continue
@@ -600,7 +601,7 @@ class RefPart(PaperPart):
         self.block = word.References()
         self._block_load_body()
 
-    def _ref_get_author(self, data: dict[str, str]) -> list[str]:
+    def _ref_get_author(self, data: Dict[str, str]) -> List[str]:
         if data["langid"] == "english":
             names = data["author"].split("and")
             authors = []
@@ -633,7 +634,7 @@ class RefPart(PaperPart):
             log_error("没做"+str(data))
         return author
 
-    def _ref_get_entrytype(self, data: dict[str, str]) -> str:
+    def _ref_get_entrytype(self, data: Dict[str, str]) -> str:
         type_map = {"book": "M",
                     "inproceedings": "C",
                     "": "G",
@@ -649,7 +650,7 @@ class RefPart(PaperPart):
                     }
         return type_map[data["ENTRYTYPE"]]
 
-    def _ref_get_back(self, data: dict[str, str]) -> str:
+    def _ref_get_back(self, data: Dict[str, str]) -> str:
         back = ""
         if "address" in data and "publisher" in data:
             address = data["address"].replace("{", "").replace("}", "")
@@ -657,7 +658,7 @@ class RefPart(PaperPart):
             back = "{}: {}, ".format(address, publisher)
         return back
 
-    def _ref_GB_T_7714_2005(self, data: dict[str, str]) -> str:
+    def _ref_GB_T_7714_2005(self, data: Dict[str, str]) -> str:
         assert_error("langid" in data, "参考文献应该有语言信息: "+str(data))
         langid = data["langid"]
         author = self._ref_get_author(data)
@@ -676,7 +677,7 @@ class RefPart(PaperPart):
             log_error("没做"+str(data))
         return ref_item
 
-    def _load_bib(self) -> dict[str, str]:
+    def _load_bib(self) -> Dict[str, str]:
         if self.bib_path == "":
             return {}
         with open(self.bib_path) as bibtex_file:
@@ -694,7 +695,7 @@ class RefPart(PaperPart):
                            "参考文献索引不能重复: " + ref)
             self.ref_map[ref] = ref_map[ref]
 
-    def filt_ref(self, ref_items: dict[str, RefItem]):
+    def filt_ref(self, ref_items: Dict[str, RefItem]):
         ali_list = [(int(ref_items[ali].index), ali)
                     for ali in ref_items
                     if ref_items[ali].type == RefItem.LITER]
