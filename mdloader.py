@@ -10,7 +10,7 @@ from bibtexparser.bparser import BibTexParser
 from typing import Dict, List
 
 from mdext import MDExt
-import md2paper as word
+import dut_paper as word
 
 file_dir = ""
 debug = False
@@ -400,8 +400,10 @@ class PaperPart:
 
     # 渲染
 
-    def _block_load_body(self):
-        for (name, cont) in self.contents:
+    def _block_load_body(self, conts=None):
+        if conts == None:
+            conts = self.contents
+        for (name, cont) in conts:
             if name == "h1":
                 self.block.add_chapter(cont)
             elif name == "h2":
@@ -735,7 +737,9 @@ class AppenPart(PaperPart):
 
     def _block_load_contents(self):
         self.block = word.Appendixes()
-        # FIXME
+        for appen in self.appens:
+            self.block.add_appendix(appen.title)
+            self._block_load_body(appen.contents)
 
     def _process_title(self, title: str, index: int):
         assert_warning(title[:2] == "附录", "附录应该以附录和编号开头: " + title)
