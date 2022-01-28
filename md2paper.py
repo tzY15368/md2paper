@@ -9,7 +9,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
-
+import datetime
 
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
@@ -394,25 +394,45 @@ class Metadata(Component):
     number: str = None
     teacher: str = None
     auditor: str = None
-    finish_date: str = None
+    __finish_date: str = None
     title_zh_CN: str = None
     title_en: str = None
+
+    @property
+    def finish_date(self):
+        if self.__finish_date:
+            return self.__finish_date
+        else:
+            now = datetime.datetime.now()
+            return now.strftime("%Y年%m月%d日")
+
+    @finish_date.setter
+    def finish_date(self, value):
+        self.__finish_date = value
 
     def __fill_blank(self, blank_length:int, data:str)->str:
         """
         填充诸如 "学 生 姓 名：______________"的域
         **一个中文算两个字符
-        FIXME: 某些域多出两个空格
+        **中文和数字之间会多一个空格
         """
         def get_data_len(data:str)->int:
             # 判断是否中文, 一个中文算两个字符
+            def is_zh_CN(char)->bool:
+                return '\u4e00' <= char <= '\u9fa5'
             len = 0
+            prev_char_type = False
+            prev_char = None
             for char in data:
-                if '\u4e00' <= char <= '\u9fa5':
-                    len += 2
-                else:
+                current_char_type = is_zh_CN(char)
+                len += 1
+                if current_char_type:
                     len += 1
-            return len
+                if current_char_type != prev_char_type and prev_char!=None:
+                    len += 0.5
+                prev_char_type = current_char_type
+                prev_char = char
+            return int(len)
 
         head_length = int((blank_length - get_data_len(data)) /2)
         if head_length <0:
@@ -422,7 +442,8 @@ class Metadata(Component):
         return content
 
     def render_template(self):
-        # 只支持论文，不支持翻译！！
+        # 目前只支持论文，不支持翻译！！
+
         title_mapping = {
             'zh_CN': 4,
             'en': 5,
@@ -656,8 +677,6 @@ class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
 
 class ChangeRecord(Component): #修改记录
     def render_template(self) -> int:
-        # fixme: this anchor doesn't work, need to traverse backwards.
-        # add API in render_template?
         ANCHOR = "修改记录"
         ANCHOR_STYLE = "Heading 1"
         incr_next = 0
