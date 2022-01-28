@@ -702,7 +702,8 @@ class RefPart(PaperPart):
         self.ref_list = []
         for index, ali in ali_list:
             assert_warning(ali in self.ref_map,
-                           "引用的文献应该在参考文献中出现: " + ali)
+                           "引用的文献应该在参考文献中出现: " + ali +
+                           " BibTeX_path: '" + self.bib_path + "'")
             if ali in self.ref_map:
                 self.ref_list.append(
                     "[{}] {}".format(index, self.ref_map[ali]))
