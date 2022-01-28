@@ -623,7 +623,17 @@ class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
     def __init__(self) -> None:
         super().__init__()
 
-    def add_appendix(self, appendix_title:str,appendix_content:str):
+    def get_default_location(self)->Block:
+        return self.get_internal_text().get_last_sub_block()
+
+    def add_appendix(self, appendix_title:str)->Block:
+        new_appendix = Block()
+        new_appendix.set_title(appendix_title,level=Block.heading_1)
+        self.get_internal_text().add_sub_block(new_appendix)
+        return new_appendix
+
+    # returns the added appendix
+    def add_appendix2(self, appendix_title:str,appendix_content:str)->Block:
         new_appendix = Block()
         new_appendix.set_title(appendix_title,level=Block.heading_1)
         new_appendix.add_content(content_list=Text.read(appendix_content))
@@ -639,7 +649,6 @@ class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
 
         line_delete_count = 1
         pos = DM.get_anchor_position(anchor_text=anchor_text)-1
-        #print('text:',DM.get_doc().paragraphs[pos].text)
         for i in range(line_delete_count):
             DM.delete_paragraph_by_index(pos)
         return offset - line_delete_count
@@ -688,16 +697,21 @@ class Block(): #content
         self.__id = id
 
     # 由level决定标题的样式（heading1，2，3）
-    def set_title(self,title:str,level:int) -> None:
+    def set_title(self,title:str,level:int) -> Block:
         self.__title = title
         if level not in range(0,5):
             raise ValueError("invalid heading level")
         self.__level = level
-        #print('set title',self.__title)
+        return self
     
     def add_sub_block(self,block:Block)->Block:
         self.__sub_blocks.append(block)
         return block
+
+    def get_last_sub_block(self)->Block:
+        if len(self.__sub_blocks)==0:
+            raise ValueError("no available sub-blocks")
+        return self.__sub_blocks[-1]
 
     def add_content(self,content:Union[Text,Image,Table,Formula]=None,
             content_list:Union[List[Text],List[Image],List[Table],List[Formula]]=[]) -> Block:
@@ -862,8 +876,10 @@ But if you know for sure none of those are present, these few lines should get t
     cha.render_template()
 
     apd = Appendixes()
-    apd.add_appendix("附录A","啊哈哈哈鸡汤来喽")
-    apd.add_appendix("附录B","直接来吧")
+    apd.add_appendix("附录A")
+    apd.add_text([Text("啊哈哈哈鸡汤来喽")])
+    apd.add_appendix("附录B")
+    apd.add_text([Text("直接来吧")])
     apd.render_template()
 
     #DM.update_toc()
