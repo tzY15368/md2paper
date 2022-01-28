@@ -12,7 +12,7 @@ from mdext import MDExt
 import md2paper as word
 
 file_dir = ""
-debug = True
+debug = False
 
 
 # 检查
@@ -409,9 +409,9 @@ class PaperPart:
                 self.block.add_subsection(cont)
             elif name in ["p", "fh4", "fh5"]:
                 if not debug:
-                    para = self.block.add_text("")
+                    para = word.Text()
                 else:
-                    para = self.block.add_text(name)
+                    para = word.Text(name)
                 for run in cont:
                     if run["type"] == "text":
                         para.add_run(word.Run(run["text"], word.Run.Normal))
@@ -425,16 +425,20 @@ class PaperPart:
                     elif run["type"] == "math-inline":
                         para.add_run(word.Run(run["text"], word.Run.Formula))
                     elif run["type"] == "ref":
-                        para.add_run(word.Run(run["text"], word.Run.Normal))
+                        para.add_run(
+                            word.Run(run["text"], word.Run.Superscript))
                     else:
                         print("还没实现now", name)
+                self.block.add_text([para])
             elif name == "img":
-                self.block.add_image(
-                    [word.ImageData(cont["src"], cont["title"])])
+                img = word.Image([word.ImageData(cont["src"], cont["title"])])
+                self.block.add_text([img])
             elif name == "table":
-                self.block.add_table(cont['title'], cont['data'])
+                table = word.Table(cont['title'], cont['data'])
+                self.block.add_text([table])
             elif name == "math":
-                self.block.add_formula(cont['title'], cont['text'])
+                formula = word.Formula(cont['title'], cont['text'])
+                self.block.add_text([formula])
             else:
                 print("还没实现now", name)
 
@@ -576,7 +580,8 @@ class RefPart(PaperPart):
                     if text[0] == "literature":
                         refs += text[1:]
                     elif text[0] == "bib":
-                        self.bib_path = text[1]
+                        bib_path = os.path.join(file_dir, text[1])
+                        self.bib_path = bib_path
                     else:
                         log_error("这啥? " + i)
             cur = cur.next_sibling
@@ -593,7 +598,7 @@ class RefPart(PaperPart):
 
     def _block_load_contents(self):
         self.block = word.References()
-        pass  # FIXME
+        self._block_load_body()
 
     def _ref_get_author(self, data: dict[str, str]) -> list[str]:
         if data["langid"] == "english":
@@ -701,6 +706,8 @@ class RefPart(PaperPart):
             if ali in self.ref_map:
                 self.ref_list.append(
                     "[{}] {}".format(index, self.ref_map[ali]))
+        self.contents = [("p", [{"type": "text", "text": text}])
+                         for text in self.ref_list]
 
 
 class AppenPart(PaperPart):
@@ -754,7 +761,7 @@ class RecordPart(PaperPart):
 
     def _block_load_contents(self):
         self.block = word.ChangeRecord()
-        # self._block_load_body() # FIXME
+        self._block_load_body()
 
 
 class ThanksPart(PaperPart):
