@@ -665,6 +665,12 @@ class Acknowledgments(Component): #致谢
         return super().render_template(ANCHOR,incr_next,incr_kw)
     
 
+"""
+每一章是一个chapter，
+每个chapter内标题后可以直接跟block或section，
+每个section内标题后可以直接跟block或subsection，
+每个subsection内标题后可以跟block
+"""
 class Block(): #content
     # 每个block是多个image，formula，text的组合，内部有序
     heading_1 = 1
@@ -745,30 +751,6 @@ class Block(): #content
         for content in self.__content_list:
             new_offset = content.render_paragraph(new_offset)
         return new_offset
-
-class DUTThesisPaper():
-    """
-    每一章是一个chapter，
-    每个chapter内标题后可以直接跟block或section，
-    每个section内标题后可以直接跟block或subsection，
-    每个subsection内标题后可以跟block
-    """
-
-    metadata:Metadata = None
-    def setMetadata(self,data:Metadata)->None:
-        self.metadata = data
-    
-    abstract:Abstract = None
-    def setAbstract(self,abstract:Abstract)->None:
-        self.abstract = abstract
-
-    def toDocx():
-        pass
-
-
-class MD2Paper():
-    def __init__(self) -> None:
-        pass
 
 if __name__ == "__main__":
     
