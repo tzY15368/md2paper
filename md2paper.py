@@ -1,5 +1,4 @@
 from __future__ import annotations
-from lib2to3.pytree import Base
 from typing import Dict, Union,List
 import docx
 from docx.shared import Inches,Cm
@@ -92,13 +91,27 @@ class Component():
     def get_internal_text(self)->Block:
         return self.__internal_text
 
-    def add_text(self, text:Union[str,List[BaseContent]]):
+    def get_default_location(self)->Block:
+        return self.get_internal_text()
+
+    def add_text(self, text:Union[str,List[BaseContent]], location:Block=None)->Union[BaseContent,None]:
+        if not location:
+            location = self.get_default_location()
+
         if type(text)==str:
-            self.__internal_text.add_content(content_list=Text.read(text))
+            txt = Text.read(text)
+            location.add_content(content_list=txt)
+            if len(txt) > 0:
+                return txt[-1]
+            else:
+                return None
 
         elif type(text)==list and sum([1 if isinstance(i,BaseContent) else 0 for i in text])==len(text):
-            self.__internal_text.add_content(content_list=text)
-
+            location.add_content(content_list=text)
+            if len(text) > 0:
+                return text[-1]
+            else:
+                return None
         else:
             raise TypeError("expected text/List[BaseContent]")
 
@@ -512,9 +525,14 @@ class MainContent(Component): # 正文
             'section':None,
             'subsection':None
         }
-        self.__last_subblk:Block = None
         
     def get_last_subblock(self)->Block:
+        if 'blk' not in self.__prev:
+            raise ValueError("last blk is not yet set")
+        return self.__prev['blk']
+
+    # get_last_subblock
+    def get_default_location(self) -> Block:
         if 'blk' not in self.__prev:
             raise ValueError("last blk is not yet set")
         return self.__prev['blk']
@@ -563,38 +581,6 @@ class MainContent(Component): # 正文
 
         new_subsection.set_title(title,Block.heading_3)
         return section.add_sub_block(new_subsection)
-
-    # 独立的公式, 内联公式应该拿到text之后使用text.add_run
-    def add_formula(self, title:str, formula:str, location:Block=None):
-        if not location:
-            location = self.get_last_subblock()
-        location.add_content(Formula(title,formula))
-
-    def add_text(self, text:Union[str,Run], location:Block=None)->Text: # 返回最后一块text
-        if not location:
-            location = self.get_last_subblock()
-        if type(text)==str:
-            content = Text.read(text)
-            # location对应block内含多个paragraph
-            location.add_content(content_list=content)
-            return content[-1]
-        elif type(text)==Run:
-            txt = Text()
-            txt.add_run(text)
-            location.add_content(txt)
-            return txt
-        else:
-            raise TypeError("expect str/Run")
-
-    def add_image(self, images:List[ImageData], location:Block=None):
-        if not location:
-            location = self.get_last_subblock()
-        location.add_content(Image(images))
-
-    def add_table(self, title:str, table:List[Union[None,List[str]]], location:Block=None):
-        if not location:
-            location = self.get_last_subblock()
-        location.add_content(Table(title,table))
 
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
     def render_template(self) -> int:
@@ -845,12 +831,13 @@ But if you know for sure none of those are present, these few lines should get t
     txt = mc.add_text(h,location=ss1)
     txt.add_run(Run("this should be bold",Run.Bold))
     txt.add_run(Run("italic and bold",Run.Italics|Run.Bold))
-    mc.add_image([
+    images = Image([
         ImageData("classes.png","图1：these are the classes"),
         ImageData("classes.png","图2:asldkfja;sldkf")
-    ],location=ss1)
-    mc.add_formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN",location=ss1)
-    mc.add_text(Run("only italics",Run.Italics),location=ss1)
+    ])
+    formula = Formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN")
+    more_text = Text().add_run(Run("only italics",Run.Italics))
+    mc.add_text([images,formula,more_text])
 
     c3 = mc.add_chapter("第三章 大观园")
     mc.add_text(t,location=c3)
@@ -860,8 +847,8 @@ But if you know for sure none of those are present, these few lines should get t
         Row(['刘姥姥初试惊奇队长',None,'刘姥姥菜花染诸神']),
         Row(['菜花反噬！','天地乖离菜花之星','重启刘姥姥菜花宇宙'],top_border=True)
     ]
-    mc.add_table("表1 刘姥姥背叛斯大林",data,location=c3)
-    mc.add_text("wtf is this?",location=c3)
+    table = Table("表1 刘姥姥背叛斯大林",data)
+    mc.add_text([table, Text("wtf is this?")],location=c3)
     mc.render_template()
 
     conc = Conclusion()
