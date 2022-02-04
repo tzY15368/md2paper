@@ -66,6 +66,10 @@ class DocManager():
         if i==-1: raise ValueError(f"anchor `{anchor_text}` not found") 
         return i + 1
 
+    @classmethod
+    def get_paragraph(cls,offset:int):
+        return cls.get_doc().paragraphs[offset]
+
     # https://stackoverflow.com/questions/51360649/how-to-update-table-of-contents-in-docx-file-with-python-on-linux?rq=1
     @classmethod
     def update_toc(cls):
@@ -219,10 +223,11 @@ class Image(BaseContent):
             # 先换一行
             r0 = p.add_run()
             r0.add_break(WD_BREAK.LINE)
-            r = p.add_run()
-            r.add_picture(img.img_src,width=Inches(4.0), height=Inches(4.7))
-            r2 = p.add_run()
-            r2.add_break(WD_BREAK.LINE)
+            if img.img_src:
+                r = p.add_run()
+                r.add_picture(img.img_src,width=Inches(4.0), height=Inches(4.7))
+                r2 = p.add_run()
+                r2.add_break(WD_BREAK.LINE)
             r3 = p.add_run()
             r3.add_text("\n"+img.img_alt)
             # 结尾再换
