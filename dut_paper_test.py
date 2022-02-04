@@ -90,10 +90,9 @@ But if you know for sure none of those are present, these few lines should get t
 这里看上去有点奇怪，每个状态对象都只有静态方法，并没有存储任何的实例属性数据。 实际上，所有状态信息都只存储在 Connection 实例中。 
 在基类中定义的 NotImplementedError 是为了确保子类实现了相应的方法。 这里你或许还想使用8.12小节讲解的抽象基类方式。
 设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
-    #conc.set_conclusion(e)
     conc.add_text(e)
     conc.add_text([Text().add_run(Run("additional italics text",Run.Italics)), Image([ImageData("classes.png","图3：这是classes")])])
-    conc.render_template()
+    conc.render_template(override_title="设计总结")
 
     ref = References()
     h = """[1] 国家标准局信息分类编码研究所.GB/T 2659-1986 世界各国和地区名称代码[S]//全国文献工作标准化技术委员会.文献工作国家标准汇编:3.北京:中国标准出版社,1988:59-92. 

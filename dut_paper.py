@@ -247,11 +247,15 @@ class MainContent(Component): # 正文
         return offset - line_delete_count
 
 class Conclusion(Component):
-    def render_template(self) -> int:
+    def render_template(self,override_title:str=None) -> int:
         ANCHOR = "结    论（设计类为设计总结）"
         incr_next = 3
         incr_kw = "参 考 文 献"
-        return super().render_template(ANCHOR, incr_next, incr_kw)
+        new_offset = super().render_template(ANCHOR, incr_next, incr_kw)
+        if override_title:
+            title_offset = DM.get_anchor_position(ANCHOR) - 1
+            DM.get_doc().paragraphs[title_offset].runs[1].text = override_title
+        return new_offset
 
 class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
     def __init__(self) -> None:
