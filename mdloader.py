@@ -11,6 +11,7 @@ from typing import Dict, List
 
 from mdext import MDExt
 import dut_paper as word
+import dut_paper_translation as transword
 
 file_dir = ""
 debug = False
@@ -824,7 +825,16 @@ class TransMetaPart(PaperPart):
         self.organization = data_dict["工作单位"]
 
     def _block_load_contents(self):
-        pass  # FIXME
+        self.block = transword.TranslationMetadata()
+
+        self.block.title_zh_CN = self.title_zh_CN
+        self.block.title_en = self.title_en
+        self.block.school = self.school
+        self.block.major = self.major
+        self.block.name = self.name
+        self.block.number = self.number
+        self.block.teacher = self.teacher
+        self.block.finish_date = self.finish_date
 
 
 class TransAbsPart(PaperPart):
@@ -842,9 +852,15 @@ class TransAbsPart(PaperPart):
         self.keywords_zh_CN = [rbk(i.text)
                                for i in abs_cn_h1.find_next_sibling("ul").find_all("li")]
         self.title_zh_CN = ""
+        self.author = ""
+        self.organization = ""
 
     def _block_load_contents(self):
-        pass  # FIXME
+        self.block = transword.TranslationAbstract(self.title_zh_CN,
+                                                   self.author,
+                                                   self.organization)
+        self._block_load_body(self.conts_zh_CN)
+        self.block.add_keywords(self.keywords_zh_CN)
 
 
 class TransMainPart(PaperPart):
@@ -875,8 +891,11 @@ class TransMainPart(PaperPart):
     def compile(self):
         self._link_ref()
 
+        self.contents.insert(-2, ("p", []))
+
     def _block_load_contents(self):
-        pass  # FIXME
+        self.block = transword.TranslationMainContent()
+        self._block_load_body()
 
 
 class Paper:
@@ -974,6 +993,13 @@ class TranslationPaper(Paper):
             self.abs,
             self.main
         ]
+
+    def compile(self):
+        super().compile()
+
+        self.abs.author = self.meta.author
+        self.abs.organization = self.meta.organization
+        self.abs.title_zh_CN = self.meta.title_zh_CN
 
 
 if __name__ == "__main__":

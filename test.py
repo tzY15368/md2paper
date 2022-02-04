@@ -15,4 +15,4 @@ if __name__ == "__main__":
     paper.load_contents()
     paper.compile()
 
-    paper.render("外文翻译模板-docx.docx", "test/Translation.docx")
+    paper.render("外文翻译模板-docx.docx", "test/out_trans.docx")
