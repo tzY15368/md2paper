@@ -814,7 +814,7 @@ class TransMetaPart(PaperPart):
         self.finish_date = data_dict["完成日期"]
 
         # 外文作者信息
-        data_table = data_table.find_next_sibling("table").find("tbody")
+        data_table = mete_h1.find_next_siblings("table")[1].find("tbody")
         data_lines = data_table.find_all("tr")
         data_pairs = [list(map(lambda x: rbk(x.text), i.find_all("td")))
                       for i in data_lines]
@@ -852,6 +852,28 @@ class TransMainPart(PaperPart):
         main_h1 = soup.find("h1", string=re.compile("正文"))
         conts = self._get_content_from(main_h1.next_sibling)
         self.contents = conts
+
+    def _link_ref(self) -> int:
+        for name, cont in self.contents:
+            if name not in ["p", "fh4", "fh5"]:
+                continue
+            is_text = False
+            for run in cont:
+                if run["type"] != "ref":
+                    if run["type"] == "text" and run["text"].endswith("文献"):
+                        is_text = True
+                    continue
+
+                if is_text:
+                    run["type"] = "text"
+                else:
+                    run["type"] = "ref"
+                run["text"] = "[{}]".format(run["text"])
+
+                is_text = False
+
+    def compile(self):
+        self._link_ref()
 
     def _block_load_contents(self):
         pass  # FIXME
