@@ -1,3 +1,4 @@
+import logging
 from md2paper import *
 
 from typing import Dict
@@ -13,6 +14,36 @@ class Metadata(Component):
     __finish_date: str = None
     title_zh_CN: str = None
     title_en: str = None
+
+    # 封面个人信息留空长度
+    BLANK_LENGTH = 23
+
+    def get_line_mapping(self)->Dict[str,str]:
+        data = {
+            "学 院（系）：":self.school,
+            "专       业：":self.major,
+            "学 生 姓 名：":self.name,
+            "学       号：":self.number,
+            "指 导 教 师：":self.teacher,
+            "评 阅 教 师：":self.auditor,
+            "完 成 日 期：":self.finish_date
+        }
+        # 返回前判空
+        for key in data:
+            if not data[key]:
+                logging.warning(f"key {key} is empty")
+        return data
+
+    def get_title_mapping(self)->Dict[str,str]:
+        data = {
+            "大连理工大学本科毕业设计（论文）题目":self.title_zh_CN,
+            "The Subject of Undergraduate Graduation Project (Thesis) of DUT":self.title_en
+        }
+        # 返回前判空
+        for key in data:
+            if not data[key]:
+                logging.warning(f"key {key} is empty")
+        return data
 
     @property
     def finish_date(self):
@@ -68,30 +99,20 @@ class Metadata(Component):
             for run in p.runs[1:]:
                 run.text = ""
 
-        # 目前只支持论文，不支持翻译！！
-
-        title_mapping = {
-            'zh_CN': 4,
-            'en': 5,
-        }
-        DM.get_doc().paragraphs[title_mapping['zh_CN']].runs[0].text = self.title_zh_CN
-        DM.get_doc().paragraphs[title_mapping['en']].runs[0].text = self.title_en
-
-        line_mapping = {
-            15: self.school,
-            16: self.major,
-            17: self.name,
-            18: self.number,
-            19: self.teacher,
-            20: self.auditor,
-            21: self.finish_date
-        }
-        BLANK_LENGTH = 23
-        for line_no in line_mapping:
-            if line_mapping[line_no] == None:
+        mapping = self.get_title_mapping()
+        for field in mapping:
+            if not mapping[field]:
                 continue
-            #print(len(DM.get_doc().paragraphs[line_no].runs[-1].text))
-            DM.get_doc().paragraphs[line_no].runs[-1].text = self.__fill_blank(BLANK_LENGTH,line_mapping[line_no])
+            offset = DM.get_anchor_position(field) - 1
+            DM.get_doc().paragraphs[offset].runs[0].text = mapping[field]
+
+        mapping = self.get_line_mapping()
+        for field in mapping:
+            if not mapping[field]:
+                continue
+            offset = DM.get_anchor_position(field) - 1
+            data = self.__fill_blank(self.BLANK_LENGTH,mapping[field])
+            DM.get_doc().paragraphs[offset].runs[-1].text = data
 
 class Abstract(Component):
 
@@ -247,11 +268,15 @@ class MainContent(Component): # 正文
         return offset - line_delete_count
 
 class Conclusion(Component):
-    def render_template(self) -> int:
+    def render_template(self,override_title:str=None) -> int:
         ANCHOR = "结    论（设计类为设计总结）"
         incr_next = 3
         incr_kw = "参 考 文 献"
-        return super().render_template(ANCHOR, incr_next, incr_kw)
+        new_offset = super().render_template(ANCHOR, incr_next, incr_kw)
+        if override_title:
+            title_offset = DM.get_anchor_position(ANCHOR) - 1
+            DM.get_doc().paragraphs[title_offset].runs[1].text = override_title
+        return new_offset
 
 class Appendixes(Component): #附录abcdefg, 是一种特殊的正文
     def __init__(self) -> None:

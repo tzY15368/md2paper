@@ -548,13 +548,26 @@ class MainPart(PaperPart):
 class ConcPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
         conclusion_h1 = soup.find("h1", string=re.compile("结论"))
+        if conclusion_h1 == None:
+            conclusion_h1 = soup.find("h1", string=re.compile("设计总结"))
+        assert_error(conclusion_h1 != None, "应该有结论或设计总结")
         conts = self._get_content_until(conclusion_h1.next_sibling,
                                         soup.find("h1", string=re.compile("参考文献")))
         self.contents = conts
+        headline = rbk(conclusion_h1.text)
+        assert_warning(headline in ["结论", "设计总结"],
+                       "结论部分的标题应该是结论/设计总结: "+headline)
+        if headline == "结论":
+            headline = "结    论"
+        self.headline = headline
 
     def _block_load_contents(self):
         self.block = word.Conclusion()
         self.block.add_text(assemble_ps(self.contents))
+
+    def render(self):
+        self._block_load_contents()
+        self.block.render_template(self.headline)
 
 
 class RefPart(PaperPart):
