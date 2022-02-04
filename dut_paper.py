@@ -58,6 +58,16 @@ class Metadata(Component):
         return content
 
     def render_template(self):
+        # 首先设置header
+        for section in DM.get_doc().sections:
+            p = section.header.paragraphs[0]
+            if len(p.runs) == 0:
+                continue
+            p.runs[0].text = f"\t{self.title_zh_CN}\t"
+            # 清空剩下的run
+            for run in p.runs[1:]:
+                run.text = ""
+
         # 目前只支持论文，不支持翻译！！
 
         title_mapping = {
