@@ -10,7 +10,7 @@ from bibtexparser.bparser import BibTexParser
 from typing import Dict, List
 
 from mdext import MDExt
-import md2paper as word
+import dut_paper as word
 
 file_dir = ""
 debug = False
@@ -400,8 +400,10 @@ class PaperPart:
 
     # 渲染
 
-    def _block_load_body(self):
-        for (name, cont) in self.contents:
+    def _block_load_body(self, conts=None):
+        if conts == None:
+            conts = self.contents
+        for (name, cont) in conts:
             if name == "h1":
                 self.block.add_chapter(cont)
             elif name == "h2":
@@ -558,8 +560,8 @@ class ConcPart(PaperPart):
 class RefPart(PaperPart):
     def __init__(self):
         super().__init__()
-        self.ref_map: dict[str, str] = {}
-        self.ref_list: list[str] = []
+        self.ref_map: Dict[str, str] = {}
+        self.ref_list: List[str] = []
 
     def load_contents(self, soup: BeautifulSoup):
         reference_h1 = soup.find("h1", string=re.compile("参考文献"))
@@ -568,7 +570,7 @@ class RefPart(PaperPart):
             until_h1 = soup.find("h1", string=re.compile("修改记录"))
 
         self.bib_path = ""
-        refs: list[str] = []
+        refs: List[str] = []
 
         cur = reference_h1.next_sibling
         while cur != until_h1:
@@ -720,7 +722,7 @@ class AppenPart(PaperPart):
 
     def __init__(self):
         super().__init__()
-        self.appens: list[self.AppenOne] = []
+        self.appens: List[self.AppenOne] = []
 
     def load_contents(self, soup: BeautifulSoup):
         appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
@@ -735,7 +737,9 @@ class AppenPart(PaperPart):
 
     def _block_load_contents(self):
         self.block = word.Appendixes()
-        # FIXME
+        for appen in self.appens:
+            self.block.add_appendix(appen.title)
+            self._block_load_body(appen.contents)
 
     def _process_title(self, title: str, index: int):
         assert_warning(title[:2] == "附录", "附录应该以附录和编号开头: " + title)
@@ -779,7 +783,7 @@ class ThanksPart(PaperPart):
 class Paper:
     def __init__(self):
         self.parts: list[PaperPart]
-        self.ref_items: dict[str, dict[str, str]] = {}
+        self.ref_items: Dict[str, Dict[str, str]] = {}
 
     def load_md(self, md_path: str):
         with open(md_path, "r") as f:
@@ -829,7 +833,7 @@ class GraduationPaper(Paper):
         self.record = RecordPart()
         self.thanks = ThanksPart()
 
-        self.parts: list[PaperPart] = [
+        self.parts: List[PaperPart] = [
             self.meta,
             self.abs,
             self.intro,
