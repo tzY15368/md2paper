@@ -1,4 +1,5 @@
 out.docx
+out_*.docx
 ~*
 # Byte-compiled / optimized / DLL files
 __pycache__/
