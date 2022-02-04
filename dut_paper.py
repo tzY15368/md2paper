@@ -28,10 +28,6 @@ class Metadata(Component):
             "评 阅 教 师：":self.auditor,
             "完 成 日 期：":self.finish_date
         }
-        # 返回前判空
-        for key in data:
-            if not data[key]:
-                logging.warning(f"key {key} is empty")
         return data
 
     def get_title_mapping(self)->Dict[str,str]:
@@ -39,10 +35,6 @@ class Metadata(Component):
             "大连理工大学本科毕业设计（论文）题目":self.title_zh_CN,
             "The Subject of Undergraduate Graduation Project (Thesis) of DUT":self.title_en
         }
-        # 返回前判空
-        for key in data:
-            if not data[key]:
-                logging.warning(f"key {key} is empty")
         return data
 
     @property
@@ -255,14 +247,13 @@ class MainContent(Component): # 正文
     # 由于无法定位正文，需要先生成引言，再用引言返回的offset
     def render_template(self) -> int:
         anchor_text = "1  正文格式说明"
-        anchor_style = "Heading 1"
         incr_next = 3
         incr_kw = "结    论（设计类为设计总结"
         #此处没有覆盖原有内容，因此还需要删去原有的大标题 1 正文格式……
-        offset = super().render_template(anchor_text,incr_next,incr_kw,anchor_style_name=anchor_style)
+        offset = super().render_template(anchor_text,incr_next,incr_kw)
         
         line_delete_count = 1
-        pos = DM.get_anchor_position(anchor_text,anchor_style_name=anchor_style) - 1
+        pos = DM.get_anchor_position(anchor_text) - 1
         for i in range(line_delete_count):
             DM.delete_paragraph_by_index(pos)
         return offset - line_delete_count

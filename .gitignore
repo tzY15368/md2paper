@@ -1,4 +1,5 @@
 out.docx
+out_*.docx
 ~*
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -131,4 +132,6 @@ dmypy.json
 .pyre/
 
 .vscode/
+.DS_Store
+
 *.bib
