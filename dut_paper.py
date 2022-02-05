@@ -32,8 +32,14 @@ class Metadata(Component):
 
     def get_title_mapping(self)->Dict[str,str]:
         data = {
-            "大连理工大学本科毕业设计（论文）题目":self.title_zh_CN,
-            "The Subject of Undergraduate Graduation Project (Thesis) of DUT":self.title_en
+            "大连理工大学本科毕业设计（论文）题目":{
+                "text":self.title_zh_CN,
+                "max_len":38
+            },
+            "The Subject of Undergraduate Graduation Project (Thesis) of DUT":{
+                "text":self.title_en,
+                "max_len":66
+            }
         }
         return data
 
@@ -48,6 +54,24 @@ class Metadata(Component):
     @finish_date.setter
     def finish_date(self, value):
         self.__finish_date = value
+    
+    def __get_data_len(self,data:str)->int:
+            # 判断是否中文, 一个中文算两个字符
+        def is_zh_CN(char)->bool:
+            return '\u4e00' <= char <= '\u9fa5'
+        len = 0
+        prev_char_type = False
+        prev_char = None
+        for char in data:
+            current_char_type = is_zh_CN(char)
+            len += 1
+            if current_char_type:
+                len += 1
+            if current_char_type != prev_char_type and prev_char!=None:
+                len += 0.5
+            prev_char_type = current_char_type
+            prev_char = char
+        return int(len)
 
     def __fill_blank(self, blank_length:int, data:str)->str:
         """
@@ -55,29 +79,10 @@ class Metadata(Component):
         **一个中文算两个字符
         **中文和数字之间会多一个空格
         """
-        def get_data_len(data:str)->int:
-            # 判断是否中文, 一个中文算两个字符
-            def is_zh_CN(char)->bool:
-                return '\u4e00' <= char <= '\u9fa5'
-            len = 0
-            prev_char_type = False
-            prev_char = None
-            for char in data:
-                current_char_type = is_zh_CN(char)
-                len += 1
-                if current_char_type:
-                    len += 1
-                if current_char_type != prev_char_type and prev_char!=None:
-                    len += 0.5
-                prev_char_type = current_char_type
-                prev_char = char
-            return int(len)
-
-        head_length = int((blank_length - get_data_len(data)) /2)
+        head_length = int((blank_length - self.__get_data_len(data)) /2)
         if head_length <0:
             raise ValueError("值过长")
-        content = " " * head_length + data + " " * (blank_length-get_data_len(data)-head_length)
-        #print(data,get_data_len(data))
+        content = " " * head_length + data + " " * (blank_length-self.__get_data_len(data)-head_length)
         return content
 
     def render_template(self):
@@ -93,10 +98,15 @@ class Metadata(Component):
 
         mapping = self.get_title_mapping()
         for field in mapping:
-            if not mapping[field]:
+            text = mapping[field].get('text')
+            if not text:
                 continue
             offset = DM.get_anchor_position(field) - 1
-            DM.get_doc().paragraphs[offset].runs[0].text = mapping[field]
+            DM.get_doc().paragraphs[offset].runs[0].text = text
+
+            # 这里如果标题太长导致折行，则额外删去一行，以防止封面溢出到第二页
+            if self.__get_data_len(text) > mapping[field]['max_len']:
+                DM.delete_paragraph_by_index(offset + 4)
 
         mapping = self.get_line_mapping()
         for field in mapping:

@@ -20,8 +20,14 @@ class TranslationMetadata(Metadata):
 
     def get_title_mapping(self) -> Dict[str, str]:
         data = {
-            "外文的中文题目":self.title_zh_CN,
-            "The title of foreign language":self.title_en
+            "外文的中文题目":{
+                "text":self.title_zh_CN,
+                "max_len":38
+            },
+            "The title of foreign language":{
+                "text":self.title_en,
+                "max_len":66
+            },
         }
         return data
 
@@ -66,9 +72,16 @@ class TranslationAbstract(Component):
             run.text = ""
         new_offset += 1
 
-        # 后面删完
-        new_offset = super().render_template(anchor_text=self.work_place,incr_kw="/\,.;'",incr_next=0)
-        
+
+        abstract_start= "摘要："
+        DM.get_paragraph(new_offset).runs[0].text = abstract_start
+        new_offset += 1
+
+        incr_kw = "关键词：(黑体、小四、加粗)"
+        new_offset = super().render_template(anchor_text=abstract_start,incr_kw=incr_kw,incr_next=0)
+        DM.get_paragraph(new_offset).runs[0].text = f"关键词：{'；'.join(self.keywords)}"
+        new_offset += 1
+
         # hack: 最后给正文预留锚点
         anchor_text = "1  正文格式说明"
         p = DM.get_paragraph(new_offset).insert_paragraph_before()
@@ -78,6 +91,11 @@ class TranslationAbstract(Component):
         p = DM.get_doc().add_paragraph()
         p = DM.get_doc().add_paragraph()
         p.text = "结    论（设计类为设计总结"
+
+        new_offset += 4
+        # 后面删完
+        while new_offset != len(DM.get_doc().paragraphs):
+            DM.delete_paragraph_by_index(new_offset)
         return new_offset
 
 class TranslationMainContent(MainContent):
