@@ -46,8 +46,9 @@ def rbk(text: str):  # remove_blank
     # 删除换行符
     text = text.replace("\n", " ")
     text = text.replace("\r", "")
+    text = text.strip(' ')
 
-    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’]'
+    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’\u0061]'
     # 中文字符后空格
     should_replace_list = re.compile(
         cn_char + u' +').findall(text)
@@ -78,7 +79,7 @@ def assemble_ps(ps):
 def split_title(title):
     assert_error(len(title.split(':')) >= 2, "应该有别名或者标题: " + title)
     ali = title.split(':')[0]
-    title = rbk(title[len(ali)+1:].strip())
+    title = rbk(title[len(ali)+1:])
     return ali, title
 
 
@@ -195,7 +196,7 @@ class PaperPart:
             elif i.name == "math-inline":
                 data.append({"type": "math-inline", "text": i.text})
             elif i.name == "ref":
-                data.append({"type": "ref", "text": rbk(i.text.strip())})
+                data.append({"type": "ref", "text": rbk(i.text)})
             else:  # 需要分段
                 if data:
                     ps.append(("p", data))
@@ -763,7 +764,7 @@ class AppenPart(PaperPart):
                        "附录应该以大写字母顺序编号: " + title)
         assert_warning(title[3] == " " and title[4] != " ",
                        "MD 中附录编号后应该有一个空格: " + title)
-        title = title[:3] + "  " + rbk(title[4:].strip())
+        title = title[:3] + "  " + rbk(title[4:])
         return title
 
     def get_ref_items(self):
