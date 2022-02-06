@@ -25,5 +25,3 @@ generate thesis paper with certain format in docx from markdown
 ## 待解决的问题
 
 - 论文首页修改日期多一个空格（中文和其他字符中间会空半个空格，故无法得到整数长度的日期字符串）
-
-- 图片自适应大小
