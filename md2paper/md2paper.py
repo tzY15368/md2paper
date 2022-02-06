@@ -11,12 +11,13 @@ from lxml import etree
 import latex2mathml.converter
 from PIL import Image as PILImage
 import logging
+import os
 
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
     tree = etree.fromstring(mathml)
     xslt = etree.parse(
-        'mml2omml.xsl'
+        os.path.join('md2paper', 'mml2omml.xsl')
         )
     transform = etree.XSLT(xslt)
     new_dom = transform(tree)

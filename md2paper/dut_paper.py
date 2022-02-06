@@ -1,5 +1,5 @@
 import logging
-from md2paper import *
+from md2paper.md2paper import *
 
 from typing import Dict
 import datetime

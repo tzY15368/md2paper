@@ -1,4 +1,4 @@
-from mdloader import GraduationPaper,TranslationPaper
+from md2paper import GraduationPaper,TranslationPaper
 import argparse, logging
 
 """

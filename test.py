@@ -1,4 +1,4 @@
-from mdloader import *
+from md2paper import *
 
 if __name__ == "__main__":
     # GraduationPaper

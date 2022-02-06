@@ -9,9 +9,9 @@ import bibtexparser
 from bibtexparser.bparser import BibTexParser
 from typing import Dict, List
 
-from mdext import MDExt
-import dut_paper as word
-import dut_paper_translation as transword
+from md2paper.mdext import MDExt
+import md2paper.dut_paper as word
+import md2paper.dut_paper_translation as transword
 
 file_dir = ""
 debug = False

@@ -1,4 +1,4 @@
-from dut_paper_translation import *
+from md2paper.dut_paper_translation import *
 
 import docx
 
