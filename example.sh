@@ -1,0 +1,1 @@
+python main.py -g example/测试论文.md -t example/测试翻译.md

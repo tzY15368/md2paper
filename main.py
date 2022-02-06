@@ -1,5 +1,6 @@
 from md2paper import GraduationPaper,TranslationPaper
 import argparse, logging
+import os
 
 """
 usage: 
@@ -9,11 +10,11 @@ python md2paper.py -g paper.md -t trans.md
 options = {
     'grad': {
         "paper_class":GraduationPaper,
-        "paper_template_path":"毕业设计（论文）模板-docx.docx"
+        "paper_template_path": os.path.join("word-template", "毕业设计（论文）模板-docx.docx")
     },
     'trans':{
         "paper_class":TranslationPaper,
-        "paper_template_path":"外文翻译模板-docx.docx"
+        "paper_template_path": os.path.join("word-template", "外文翻译模板-docx.docx")
     }
 }
 

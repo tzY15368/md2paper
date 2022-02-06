@@ -133,3 +133,5 @@ dmypy.json
 
 .vscode/
 .DS_Store
+
+example/*.docx

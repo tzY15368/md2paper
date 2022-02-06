@@ -7,7 +7,7 @@ if __name__ == "__main__":
     paper.load_contents()
     paper.compile()
 
-    paper.render("毕业设计（论文）模板-docx.docx", "example/out.docx")
+    paper.render("word-template/毕业设计（论文）模板-docx.docx", "example/out.docx")
 
     # TranslationPaper
     paper = TranslationPaper()
@@ -15,4 +15,4 @@ if __name__ == "__main__":
     paper.load_contents()
     paper.compile()
 
-    paper.render("外文翻译模板-docx.docx", "example/out_trans.docx")
+    paper.render("word-template/外文翻译模板-docx.docx", "example/out_trans.docx")
