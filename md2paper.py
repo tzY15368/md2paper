@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union,List
+from typing import Union,List,Tuple
 import docx
 from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
@@ -9,6 +9,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
+from PIL import Image as PILImage
+import logging
 
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
@@ -205,15 +207,28 @@ class Text(BaseContent):
         return [Text(i) for i in txt.split('\n')]
 
 class ImageData():
-    def __init__(self,src:str,alt:str) -> None:
+    def __init__(self,src:str,alt:str,dpi=360) -> None:
         self.img_src = src
         self.img_alt = alt
+        self.dpi = 360
 
+    # returns width,height in Inches
+    def get_size_in_doc(self)->Tuple[Inches]:
+        img = PILImage.open(self.img_src)
+        width, height = img.size
+        # 等比例缩到inches (max=6)
+        MAX_WIDTH = 6
+        result = (width/self.dpi,height/self.dpi)
+        if result[0] > MAX_WIDTH:
+            ratio = width / height
+            result = (MAX_WIDTH,MAX_WIDTH/ratio)
+        logging.debug("image size:",result)
+        return map(Inches,result)
 class Image(BaseContent):
     def __init__(self,data:List[ImageData]) -> None:
         super().__init__()
         self.__images = data
-
+    
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
         for img in self.__images:
@@ -225,7 +240,7 @@ class Image(BaseContent):
             r0.add_break(WD_BREAK.LINE)
             if img.img_src:
                 r = p.add_run()
-                r.add_picture(img.img_src,width=Inches(4.0), height=Inches(4.7))
+                r.add_picture(img.img_src,*img.get_size_in_doc())
                 r2 = p.add_run()
                 r2.add_break(WD_BREAK.LINE)
             r3 = p.add_run()
