@@ -1,28 +1,27 @@
-# md2docx
+# md2paper
 
+基于markdown模板生成符合中文论文要求格式的docx文档  
 generate thesis paper with certain format in docx from markdown
 
-主要解决的问题：无法版本控制，原有格式写起来剧痛
+## 主要解决的问题
 
-暂定采用markdown，其中公式使用latex语法，在文档生成时转word格式（how？待调研）
-插图可解决（在毕设论文模板中不存在环绕文本，必定占据一个word paragraph）
+原有word模板没有正确使用word提供的编号、格式以及ref机制，且压缩保存的word文档不易版本控制。此外，latex难以生成完美符合格式要求的终产物。
 
-## modules
+## 技术路线
 
-### 提取数据
+基于“毕业设计论文模板.docx”中内置的样式，使用python-docx库直接对文档内容进行操作，生成新文档。word线性（数组）存放文档中每个段落，md2paper使用该数组下标进行内容的增删查改操作，参考`DocManager`类以及代码中相关用法。  
+富文本支持：内联&独立latex公式、图片、表格。
 
-来自markdown或其他结构化数据源
+## 模块功能说明
 
-### 套格式
+### 前端 `mdloader.py`
 
-格式直接来自毕设模板对应位置的paragraph.style
+将来自markdown的数据转为html后使用`bs4`解析，提取为中间表示
 
-- 选项1：代码中硬编码序列化后的python对象(pickle)
+### 后端 `md2paper.py`
 
-- 选项2：用的时候必须提供template.docx
+将中间表示填充至word模板中
 
-## roadmap
+## 待解决的问题
 
-- 针对大工模板做大量硬编码（不可避免，考虑到各种cover，承诺书，xxx）优先解决问题
-
-- generic how?
+- 论文首页修改日期多一个空格（中文和其他字符中间会空半个空格，故无法得到整数长度的日期字符串）

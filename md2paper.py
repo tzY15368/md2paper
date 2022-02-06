@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union,List
+from typing import Union,List,Tuple
 import docx
 from docx.shared import Inches,Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
@@ -9,6 +9,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
+from PIL import Image as PILImage
+import logging
 
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
@@ -205,15 +207,40 @@ class Text(BaseContent):
         return [Text(i) for i in txt.split('\n')]
 
 class ImageData():
-    def __init__(self,src:str,alt:str) -> None:
+    def __init__(self,src:str,alt:str,width_ratio=0) -> None:
+        # 如果提供了0-1之间的width ratio，则会覆盖dpi设定，
+        # 宽度1则图片宽约等于可编辑区域宽度，不等于纸张宽度。
         self.img_src = src
         self.img_alt = alt
 
+        img = PILImage.open(self.img_src)
+        self.size = img.size
+        img.close()
+
+        self.dpi = 360
+        self.MAX_WIDTH_INCHES = 6
+        img_size_ratio = self.size[0]/self.size[1]
+        if width_ratio < 0 or width_ratio > 1 :
+            raise ValueError("invalid image width ratio, expecting range[0,1]")
+        if width_ratio != 0:
+            width_inches = self.MAX_WIDTH_INCHES*width_ratio
+            height_inches = width_inches/img_size_ratio
+            self.size_inches = (width_inches,height_inches)
+        else:
+            result = (self.size[0]/self.dpi,self.size[1]/self.dpi)
+            if result[0] > self.MAX_WIDTH_INCHES:
+                result = (self.MAX_WIDTH_INCHES,self.MAX_WIDTH_INCHES/img_size_ratio)
+            self.size_inches = result
+        logging.debug("image size:",self.size_inches)
+
+    # returns width,height in Inches
+    def get_size_in_doc(self)->Tuple[Inches]:
+        return map(Inches,self.size_inches)
 class Image(BaseContent):
     def __init__(self,data:List[ImageData]) -> None:
         super().__init__()
         self.__images = data
-
+    
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
         for img in self.__images:
@@ -225,7 +252,7 @@ class Image(BaseContent):
             r0.add_break(WD_BREAK.LINE)
             if img.img_src:
                 r = p.add_run()
-                r.add_picture(img.img_src,width=Inches(4.0), height=Inches(4.7))
+                r.add_picture(img.img_src,*img.get_size_in_doc())
                 r2 = p.add_run()
                 r2.add_break(WD_BREAK.LINE)
             r3 = p.add_run()

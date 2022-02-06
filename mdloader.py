@@ -46,8 +46,9 @@ def rbk(text: str):  # remove_blank
     # 删除换行符
     text = text.replace("\n", " ")
     text = text.replace("\r", "")
+    text = text.strip(' ')
 
-    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’]'
+    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’\u0061]'
     # 中文字符后空格
     should_replace_list = re.compile(
         cn_char + u' +').findall(text)
@@ -75,11 +76,24 @@ def assemble_ps(ps):
     return reduce(lambda x, y: x+"\n"+y, strs)
 
 
-def split_title(title):
+def split_title(title: str):
     assert_error(len(title.split(':')) >= 2, "应该有别名或者标题: " + title)
-    ali = title.split(':')[0]
-    title = rbk(title[len(ali)+1:].strip())
-    return ali, title
+    sp = title.split(':')
+    if len(sp) == 2:
+        ali = sp[0]
+        ratio = 0
+        title = rbk(sp[1])
+    elif len(sp) == 3:
+        ali = sp[0]
+        ratio_s = rbk(sp[1])
+        ratio = int(ratio_s[:-1])
+        assert_warning(0 < ratio <= 100,
+                       "图片占页面宽度应该在 [0%, 100%] 间, 0% 或不设置宽度为自动宽度: " + title)
+        title = rbk(sp[2])
+    else:
+        log_error("应该有别名或者标题: " + title)
+
+    return ali, title, ratio/100
 
 
 def ref_items_list_unfold(ref_items_list: list):
@@ -195,7 +209,7 @@ class PaperPart:
             elif i.name == "math-inline":
                 data.append({"type": "math-inline", "text": i.text})
             elif i.name == "ref":
-                data.append({"type": "ref", "text": rbk(i.text.strip())})
+                data.append({"type": "ref", "text": rbk(i.text)})
             else:  # 需要分段
                 if data:
                     ps.append(("p", data))
@@ -215,9 +229,10 @@ class PaperPart:
     def _process_img(self, img):
         global file_dir
         img_path = os.path.join(file_dir, img["src"])
-        ali, title = split_title(img["alt"])
+        ali, title, ratio = split_title(img["alt"])
         return ("img", {"alias": ali,
                         "title": title,
+                        "ratio": ratio,
                         "src": img_path})
 
     def _process_table(self, title, table):
@@ -248,7 +263,7 @@ class PaperPart:
                 else:
                     data.append(word.Row(row))
 
-        ali, title = split_title(title)
+        ali, title, _ = split_title(title)
         return ("table", {"alias": ali,
                           "title": title,
                           "data": data})
@@ -435,7 +450,8 @@ class PaperPart:
                         print("还没实现now", name)
                 self.block.add_text([para])
             elif name == "img":
-                img = word.Image([word.ImageData(cont["src"], cont["title"])])
+                img = word.Image(
+                    [word.ImageData(cont["src"], cont["title"], cont["ratio"])])
                 self.block.add_text([img])
             elif name == "table":
                 table = word.Table(cont['title'], cont['data'])
@@ -763,7 +779,7 @@ class AppenPart(PaperPart):
                        "附录应该以大写字母顺序编号: " + title)
         assert_warning(title[3] == " " and title[4] != " ",
                        "MD 中附录编号后应该有一个空格: " + title)
-        title = title[:3] + "  " + rbk(title[4:].strip())
+        title = title[:3] + "  " + rbk(title[4:])
         return title
 
     def get_ref_items(self):

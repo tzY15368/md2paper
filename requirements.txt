@@ -3,3 +3,4 @@ latex2mathml==3.63.3
 Markdown==3.3.6
 beautifulsoup4==4.10.0
 bibtexparser==1.2.0
+Pillow==8.2.0
