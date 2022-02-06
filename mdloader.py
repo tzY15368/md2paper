@@ -76,11 +76,24 @@ def assemble_ps(ps):
     return reduce(lambda x, y: x+"\n"+y, strs)
 
 
-def split_title(title):
+def split_title(title: str):
     assert_error(len(title.split(':')) >= 2, "应该有别名或者标题: " + title)
-    ali = title.split(':')[0]
-    title = rbk(title[len(ali)+1:])
-    return ali, title
+    sp = title.split(':')
+    if len(sp) == 2:
+        ali = sp[0]
+        ratio = 0
+        title = rbk(sp[1])
+    elif len(sp) == 3:
+        ali = sp[0]
+        ratio_s = rbk(sp[1])
+        ratio = int(ratio_s[:-1])
+        assert_warning(0 < ratio <= 100,
+                       "图片占页面宽度应该在 [0%, 100%] 间, 0% 或不设置宽度为自动宽度: " + title)
+        title = rbk(sp[2])
+    else:
+        log_error("应该有别名或者标题: " + title)
+
+    return ali, title, ratio/100
 
 
 def ref_items_list_unfold(ref_items_list: list):
@@ -216,9 +229,10 @@ class PaperPart:
     def _process_img(self, img):
         global file_dir
         img_path = os.path.join(file_dir, img["src"])
-        ali, title = split_title(img["alt"])
+        ali, title, ratio = split_title(img["alt"])
         return ("img", {"alias": ali,
                         "title": title,
+                        "ratio": ratio,
                         "src": img_path})
 
     def _process_table(self, title, table):
@@ -249,7 +263,7 @@ class PaperPart:
                 else:
                     data.append(word.Row(row))
 
-        ali, title = split_title(title)
+        ali, title, _ = split_title(title)
         return ("table", {"alias": ali,
                           "title": title,
                           "data": data})
@@ -436,7 +450,8 @@ class PaperPart:
                         print("还没实现now", name)
                 self.block.add_text([para])
             elif name == "img":
-                img = word.Image([word.ImageData(cont["src"], cont["title"])])
+                img = word.Image(
+                    [word.ImageData(cont["src"], cont["title"], cont["ratio"])])
                 self.block.add_text([img])
             elif name == "table":
                 table = word.Table(cont['title'], cont['data'])
