@@ -133,6 +133,3 @@ dmypy.json
 
 .vscode/
 .DS_Store
-
-*.bib
-!test/测试文库.bib
