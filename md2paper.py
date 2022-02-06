@@ -207,23 +207,35 @@ class Text(BaseContent):
         return [Text(i) for i in txt.split('\n')]
 
 class ImageData():
-    def __init__(self,src:str,alt:str,dpi=360) -> None:
+    def __init__(self,src:str,alt:str,width_ratio=0) -> None:
+        # 如果提供了0-1之间的width ratio，则会覆盖dpi设定，
+        # 宽度1则图片宽约等于可编辑区域宽度，不等于纸张宽度。
         self.img_src = src
         self.img_alt = alt
+
+        img = PILImage.open(self.img_src)
+        self.size = img.size
+        img.close()
+
         self.dpi = 360
+        self.MAX_WIDTH_INCHES = 6
+        img_size_ratio = self.size[0]/self.size[1]
+        if width_ratio < 0 or width_ratio > 1 :
+            raise ValueError("invalid image width ratio, expecting range[0,1]")
+        if width_ratio != 0:
+            width_inches = self.MAX_WIDTH_INCHES*width_ratio
+            height_inches = width_inches/img_size_ratio
+            self.size_inches = (width_inches,height_inches)
+        else:
+            result = (self.size[0]/self.dpi,self.size[1]/self.dpi)
+            if result[0] > self.MAX_WIDTH_INCHES:
+                result = (self.MAX_WIDTH_INCHES,self.MAX_WIDTH_INCHES/img_size_ratio)
+            self.size_inches = result
+        logging.debug("image size:",self.size_inches)
 
     # returns width,height in Inches
     def get_size_in_doc(self)->Tuple[Inches]:
-        img = PILImage.open(self.img_src)
-        width, height = img.size
-        # 等比例缩到inches (max=6)
-        MAX_WIDTH = 6
-        result = (width/self.dpi,height/self.dpi)
-        if result[0] > MAX_WIDTH:
-            ratio = width / height
-            result = (MAX_WIDTH,MAX_WIDTH/ratio)
-        logging.debug("image size:",result)
-        return map(Inches,result)
+        return map(Inches,self.size_inches)
 class Image(BaseContent):
     def __init__(self,data:List[ImageData]) -> None:
         super().__init__()
