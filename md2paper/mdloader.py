@@ -106,7 +106,11 @@ def ref_items_list_unfold(ref_items_list: list):
     return unfold_ref_items
 
 
+def re_space(s: str):
+    return re.compile("^ *{} *".format(s))
+
 # 数据类型
+
 
 class RefItem:
     IMG = "img"
@@ -507,7 +511,7 @@ class MetaPart(PaperPart):
 class AbsPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
         # 摘要
-        abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
+        abs_cn_h1 = soup.find("h1", string=re_space("摘要"))
         abs_cn_ul = abs_cn_h1.find_next_sibling("ul")
         conts_cn = self._get_content_until(abs_cn_h1.next_sibling, abs_cn_ul)
         assert_warning(conts_cn[-1] == ("p", [{"type": "text", "text": "关键词："}]),
@@ -518,7 +522,7 @@ class AbsPart(PaperPart):
         self.title_zh_CN = ""
 
         # Abstract
-        abs_en_h1 = soup.find("h1", string=re.compile("Abstract"))
+        abs_en_h1 = soup.find("h1", string=re_space("Abstract"))
         abs_en_ul = abs_en_h1.find_next_sibling("ul")
         conts_en = self._get_content_until(abs_en_h1.next_sibling, abs_en_ul)
         assert_warning(conts_en[-1] == ("p", [{"type": "text", "text": "Key Words:"}]),
@@ -540,9 +544,9 @@ class AbsPart(PaperPart):
 
 class IntroPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
-        intro_h1 = soup.find("h1", string=re.compile("引言"))
+        intro_h1 = soup.find("h1", string=re_space("引言"))
         conts = self._get_content_until(intro_h1.next_sibling,
-                                        soup.find("h1", string=re.compile("正文")))
+                                        soup.find("h1", string=re_space("正文")))
         self.contents = conts
 
     def _block_load_contents(self):
@@ -552,9 +556,9 @@ class IntroPart(PaperPart):
 
 class MainPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
-        main_h1 = soup.find("h1", string=re.compile("正文"))
+        main_h1 = soup.find("h1", string=re_space("正文"))
         conts = self._get_content_until(main_h1.next_sibling,
-                                        soup.find("h1", string=re.compile("结论")))
+                                        soup.find("h1", string=re_space("结论")))
         self.contents = conts
 
     def _block_load_contents(self):
@@ -564,12 +568,12 @@ class MainPart(PaperPart):
 
 class ConcPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
-        conclusion_h1 = soup.find("h1", string=re.compile("结论"))
+        conclusion_h1 = soup.find("h1", string=re_space("结论"))
         if conclusion_h1 == None:
-            conclusion_h1 = soup.find("h1", string=re.compile("设计总结"))
+            conclusion_h1 = soup.find("h1", string=re_space("设计总结"))
         assert_error(conclusion_h1 != None, "应该有结论或设计总结")
         conts = self._get_content_until(conclusion_h1.next_sibling,
-                                        soup.find("h1", string=re.compile("参考文献")))
+                                        soup.find("h1", string=re_space("参考文献")))
         self.contents = conts
         headline = rbk(conclusion_h1.text)
         assert_warning(headline in ["结论", "设计总结"],
@@ -594,10 +598,10 @@ class RefPart(PaperPart):
         self.ref_list: List[str] = []
 
     def load_contents(self, soup: BeautifulSoup):
-        reference_h1 = soup.find("h1", string=re.compile("参考文献"))
-        until_h1 = until_h1 = soup.find("h1", string=re.compile("附录"))
+        reference_h1 = soup.find("h1", string=re_space("参考文献"))
+        until_h1 = until_h1 = soup.find("h1", string=re.compile("^ *附录"))
         if until_h1 == None:
-            until_h1 = soup.find("h1", string=re.compile("修改记录"))
+            until_h1 = soup.find("h1", string=re_space("修改记录"))
 
         self.bib_path = ""
         refs: List[str] = []
@@ -755,8 +759,8 @@ class AppenPart(PaperPart):
         self.appens: List[self.AppenOne] = []
 
     def load_contents(self, soup: BeautifulSoup):
-        appendix_h1s = soup.find_all("h1", string=re.compile("附录"))
-        appendix_h1s.append(soup.find("h1", string=re.compile("修改记录")))
+        appendix_h1s = soup.find_all("h1", string=re.compile("^ *附录"))
+        appendix_h1s.append(soup.find("h1", string=re_space("修改记录")))
         appens = []
         for i in range(0, len(appendix_h1s)-1):
             conts = self._get_content_until(appendix_h1s[i].next_sibling,
@@ -790,9 +794,9 @@ class AppenPart(PaperPart):
 
 class RecordPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
-        mod_record_h1 = soup.find("h1", string=re.compile("修改记录"))
+        mod_record_h1 = soup.find("h1", string=re_space("修改记录"))
         conts = self._get_content_until(mod_record_h1.next_sibling,
-                                        soup.find("h1", string=re.compile("致谢")))
+                                        soup.find("h1", string=re_space("致谢")))
         self.contents = conts
 
     def _block_load_contents(self):
@@ -802,7 +806,7 @@ class RecordPart(PaperPart):
 
 class ThanksPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
-        thanks_h1 = soup.find("h1", string=re.compile("致谢"))
+        thanks_h1 = soup.find("h1", string=re_space("致谢"))
         self.contents = self._get_content_from(thanks_h1.next_sibling)
 
     def _block_load_contents(self):
@@ -856,7 +860,7 @@ class TransMetaPart(PaperPart):
 class TransAbsPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
         # 摘要
-        abs_cn_h1 = soup.find("h1", string=re.compile("摘要"))
+        abs_cn_h1 = soup.find("h1", string=re_space("摘要"))
         if abs_cn_h1 == None:
             self.conts_zh_CN = None
             return
@@ -881,7 +885,7 @@ class TransAbsPart(PaperPart):
 
 class TransMainPart(PaperPart):
     def load_contents(self, soup: BeautifulSoup):
-        main_h1 = soup.find("h1", string=re.compile("正文"))
+        main_h1 = soup.find("h1", string=re_space("正文"))
         conts = self._get_content_from(main_h1.next_sibling)
         self.contents = conts
 
