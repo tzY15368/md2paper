@@ -142,42 +142,42 @@ class Abstract(Component):
 
     def render_template(self)->int:
         # 64开始是摘要正文
-        abs_cn_start = 64
-        abs_cn_end = self.__text_zh_CN.render_block(abs_cn_start)
+        #abs_cn_start = 64
+        #abs_cn_end = self.__text_zh_CN.render_block(abs_cn_start)
         
-        while not DM.get_doc().paragraphs[abs_cn_end+2].text.startswith("关键词："):
-            DM.delete_paragraph_by_index(abs_cn_end+1)
+        offset = DM.get_anchor_position("摘    要",anchor_style_name="Heading 1")
+        offset = self.__text_zh_CN.render_block(offset)
+
+        while not DM.get_paragraph(offset+1).text.startswith("关键词："):
+            DM.delete_paragraph_by_index(offset)
         
         # cn kw
-        kw_cn_start = abs_cn_end + 2
-        DM.get_doc().paragraphs[kw_cn_start].runs[1].text = self.__keyword_zh_CN
+        offset = offset + 1
+        DM.get_paragraph(offset).runs[1].text = self.__keyword_zh_CN
         
         # en start
+        offset = offset+4
+        DM.get_paragraph(offset).runs[0].text = self.__title_en
 
-        en_title_start = kw_cn_start+4
-        DM.get_doc().paragraphs[en_title_start].runs[1].text = self.__title_en
-
-        en_abs_start = en_title_start + 3
-        en_abs_end = self.__text_en.render_block(en_abs_start)-1
-
+        offset = offset + 3
+        offset = self.__text_en.render_block(offset)
+        
         # https://stackoverflow.com/questions/61335992/how-can-i-use-python-to-delete-certain-paragraphs-in-docx-document
-        while not DM.get_doc().paragraphs[en_abs_end+2].text.startswith("Key Words："):
-            DM.delete_paragraph_by_index(en_abs_end+1)
+        while not DM.get_paragraph(offset+1).text.startswith("Key Words："):
+            DM.delete_paragraph_by_index(offset)
 
         # en kw
-        kw_en_start = en_abs_end +2
-
+        offset = offset +1
         # https://github.com/python-openxml/python-docx/issues/740
-        delete_num = len(DM.get_doc().paragraphs[kw_en_start].runs) - 4
-        for run in reversed(list(DM.get_doc().paragraphs[kw_en_start].runs)):
-            DM.get_doc().paragraphs[kw_en_start]._p.remove(run._r)
+        delete_num = len(DM.get_doc().paragraphs[offset].runs) - 4
+        for run in reversed(list(DM.get_doc().paragraphs[offset].runs)):
+            DM.get_paragraph(offset)._p.remove(run._r)
             delete_num -= 1
             if delete_num < 1:
                 break
         
-        
-        DM.get_doc().paragraphs[kw_en_start].runs[3].text = self.__keyword_en
-        return kw_en_start+1
+        DM.get_paragraph(offset).runs[3].text = self.__keyword_en
+        return offset+1
 
 class Introduction(Component): 
     def render_template(self) -> int:
