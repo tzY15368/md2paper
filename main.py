@@ -5,7 +5,7 @@ import os
 
 """
 usage: 
-python md2paper.py -g paper.md -t trans.md
+python main.py [-g <paper.md>] [-t <trans.md>]
 """
 
 options = {
@@ -19,9 +19,9 @@ options = {
     }
 }
 
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.WARNING)
 
-parser = argparse.ArgumentParser(description="usage: python md2paper.py -g paper.md -t trans.md")
+parser = argparse.ArgumentParser(description="usage: python main.py [-g <paper.md>] [-t <trans.md>]")
 parser.add_argument('-g','--grad', type=str, help='指定生成毕设论文的md文件名',required=False)
 parser.add_argument('-t','--trans', type=str, help='指定生成英文论文翻译的md文件名',required=False)
 args = vars(parser.parse_args())
