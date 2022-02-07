@@ -4,8 +4,7 @@ import docx
 
 
 if __name__ == "__main__":
-    doc = docx.Document("毕业设计（论文）模板-docx.docx")
-    DM.set_doc(doc)
+    DM.set_doc("毕业设计（论文）模板-docx.docx")
     meta = Metadata()
     meta.school = "电子信息与电气工程"
     meta.number = "201800000"
@@ -120,4 +119,4 @@ But if you know for sure none of those are present, these few lines should get t
     apd.render_template()
 
     #DM.update_toc()
-    doc.save("out.docx")
+    DM.save("out.docx")

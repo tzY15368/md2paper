@@ -4,7 +4,6 @@ import logging
 import re
 from functools import reduce
 import os
-import docx
 import bibtexparser
 from bibtexparser.bparser import BibTexParser
 from typing import Dict, List
@@ -949,14 +948,13 @@ class Paper:
             part.compile()
 
     def render(self, doc_path: str, out_path: str):
-        doc = docx.Document(doc_path)
-        word.DM.set_doc(doc)
+        word.DM.set_doc(doc_path)
 
         for part in self.parts:
             part.render()
 
         word.DM.update_toc()
-        doc.save(out_path)
+        word.DM.save(out_path)
 
 
 class GraduationPaper(Paper):

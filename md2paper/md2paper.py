@@ -12,12 +12,16 @@ import latex2mathml.converter
 from PIL import Image as PILImage
 import logging
 import os
+import sys
+
+RESOURCE_PATH = sys.path[0]
+print(RESOURCE_PATH)
 
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
     tree = etree.fromstring(mathml)
     xslt = etree.parse(
-        os.path.join('md2paper', 'mml2omml.xsl')
+        os.path.join(RESOURCE_PATH,'md2paper','mml2omml.xsl')
         )
     transform = etree.XSLT(xslt)
     new_dom = transform(tree)
@@ -29,8 +33,17 @@ class DocManager():
     __doc_target = None
 
     @classmethod
-    def set_doc(cls,doc_target:docx.Document):
-        cls.__doc_target = doc_target
+    # doc_target: path-like string or docx.Document
+    def set_doc(cls,doc_target:Union[docx.Document,str]):
+        if type(doc_target)==str:
+            actual_path = os.path.join(RESOURCE_PATH,doc_target)
+            logging.info(f"reading from template:{actual_path}")
+            cls.__doc_target = docx.Document(doc_target)
+        elif type(doc_target)==docx.Document:
+            cls.__doc_target = doc_target
+        else:
+            raise TypeError(f"invalid doc target: expecting str or docx.Document type,\
+                 got {type(doc_target)}")
         cls.__clear_tables()
 
     @classmethod
@@ -82,6 +95,10 @@ class DocManager():
             cls.get_doc().settings.element, f"{namespace}updateFields"
         )
         element_updatefields.set(f"{namespace}val", "true")
+
+    @classmethod
+    def save(cls,out_path:str):
+        cls.__doc_target.save(out_path)
 
 DM = DocManager
 
@@ -232,7 +249,7 @@ class ImageData():
             if result[0] > self.MAX_WIDTH_INCHES:
                 result = (self.MAX_WIDTH_INCHES,self.MAX_WIDTH_INCHES/img_size_ratio)
             self.size_inches = result
-        logging.debug("image size:",self.size_inches)
+        logging.debug(f"image size:{self.size_inches[0]},{self.size_inches[1]}")
 
     # returns width,height in Inches
     def get_size_in_doc(self)->Tuple[Inches]:
