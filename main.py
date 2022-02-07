@@ -36,7 +36,7 @@ if args['level'] != None:
     logging.getLogger().setLevel(level=logging_options[args['level']])
     args.pop('level')
 else:
-    logging.getLogger().setLevel(logging.INFO)
+    logging.getLogger().setLevel(logging.WARNING)
 
 for arg in args:
     md_fname = args[arg]
@@ -48,3 +48,4 @@ for arg in args:
     paper.load_contents()
     paper.compile()
     paper.render(options[arg]['paper_template_path'], f"{md_fname[:-3]}.docx")
+print('done')
