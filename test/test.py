@@ -1,7 +1,13 @@
+import os
+import sys
+sys.path.append('..')
+import logging
+logging.getLogger().setLevel(logging.INFO)
 from md2paper import *
 
 if __name__ == "__main__":
     # GraduationPaper
+    os.chdir("..")
     paper = GraduationPaper()
     paper.load_md("example/论文.md")
     paper.load_contents()
