@@ -19,13 +19,25 @@ options = {
     }
 }
 
-logging.getLogger().setLevel(logging.WARNING)
+logging_options = {
+    'debug':logging.DEBUG,
+    'info':logging.INFO,
+    'warning':logging.WARNING
+}
 
 parser = argparse.ArgumentParser(description="usage: python main.py [-g <paper.md>] [-t <trans.md>]")
 parser.add_argument('-g','--grad', type=str, help='指定生成毕设论文的md文件名',required=False)
 parser.add_argument('-t','--trans', type=str, help='指定生成英文论文翻译的md文件名',required=False)
+parser.add_argument('-l','--level',type=str,choices=['info','debug','warning'],required=False,help='指定logging level')
 args = vars(parser.parse_args())
 if sum([1 if not args[i] else 0 for i in args])==len(args): logging.warning(parser.description)
+
+if args['level'] != None:
+    logging.getLogger().setLevel(level=logging_options[args['level']])
+    args.pop('level')
+else:
+    logging.getLogger().setLevel(logging.INFO)
+
 for arg in args:
     md_fname = args[arg]
     if not md_fname: continue
