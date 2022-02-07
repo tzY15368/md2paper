@@ -1,9 +1,11 @@
+import sys
+sys.path.append('..')
+import logging
+logging.getLogger().setLevel(logging.INFO)
 from md2paper.dut_paper_translation import *
 
-import docx
-
 if __name__ == "__main__":
-    DM.set_doc("外文翻译模板-docx.docx")
+    DM.set_doc("word-template/外文翻译模板-docx.docx")
     meta = TranslationMetadata()
     meta.school = "电子信息与电气工程"
     meta.number = "201800000"

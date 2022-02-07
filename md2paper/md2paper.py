@@ -14,14 +14,14 @@ import logging
 import os
 import sys
 
-RESOURCE_PATH = sys.path[0]
-logging.debug(f"package path:{RESOURCE_PATH}")
-
+SRC_ROOT = os.path.split(os.path.split(os.path.abspath(__file__))[0])[0]
+logging.debug(f"resource root:{SRC_ROOT}")
+print(f"path:{SRC_ROOT}")
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
     tree = etree.fromstring(mathml)
     xslt = etree.parse(
-        os.path.join(RESOURCE_PATH,'md2paper','mml2omml.xsl')
+        os.path.join(SRC_ROOT,'md2paper','mml2omml.xsl')
         )
     transform = etree.XSLT(xslt)
     new_dom = transform(tree)
@@ -36,9 +36,9 @@ class DocManager():
     # doc_target: path-like string or docx.Document
     def set_doc(cls,doc_target:Union[docx.Document,str]):
         if type(doc_target)==str:
-            actual_path = os.path.join(RESOURCE_PATH,doc_target)
+            actual_path = os.path.join(SRC_ROOT,doc_target)
             logging.info(f"reading from template:{actual_path}")
-            cls.__doc_target = docx.Document(doc_target)
+            cls.__doc_target = docx.Document(actual_path)
         elif type(doc_target)==docx.Document:
             cls.__doc_target = doc_target
         else:
@@ -233,12 +233,19 @@ class ImageData():
         self.img_src = src
         self.img_alt = alt
 
+        self.dpi = 360
+        self.MAX_WIDTH_INCHES = 6
+
+        if not self.img_src:
+            self.size = (0,0)
+            self.size_inches = (0,0)
+            logging.debug("empty image, alt={}".format(self.img_alt))
+            return
+            
         img = PILImage.open(self.img_src)
         self.size = img.size
         img.close()
 
-        self.dpi = 360
-        self.MAX_WIDTH_INCHES = 6
         img_size_ratio = self.size[0]/self.size[1]
         if width_ratio < 0 or width_ratio > 1 :
             raise ValueError("invalid image width ratio, expecting range[0,1]")

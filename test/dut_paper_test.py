@@ -1,10 +1,13 @@
+import sys
+sys.path.append('..')
+import logging
+logging.getLogger().setLevel(logging.INFO)
 from md2paper.dut_paper import *
 
-import docx
 
 
 if __name__ == "__main__":
-    DM.set_doc("毕业设计（论文）模板-docx.docx")
+    DM.set_doc("word-template/毕业设计（论文）模板-docx.docx")
     meta = Metadata()
     meta.school = "电子信息与电气工程"
     meta.number = "201800000"
@@ -46,6 +49,9 @@ But if you know for sure none of those are present, these few lines should get t
     txt.add_run(Run(" and then A",Run.Bold))
     txt.add_run(Run("2",Run.Superscript))
     intro.add_text([txt])
+    f = Formula("tt",r"\overline x")
+    f2 = Formula("bb",r"\bigvee_{j=1}^{k}{\ell_j}")
+    intro.add_text([f,Text("\n"),f2])
     intro.render_template()
 
 

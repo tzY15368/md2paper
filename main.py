@@ -1,5 +1,5 @@
 from md2paper import GraduationPaper,TranslationPaper
-from md2paper.md2paper import RESOURCE_PATH
+from md2paper.md2paper import SRC_ROOT
 import argparse, logging
 import os
 
@@ -11,11 +11,11 @@ python md2paper.py -g paper.md -t trans.md
 options = {
     'grad': {
         "paper_class":GraduationPaper,
-        "paper_template_path": os.path.join(RESOURCE_PATH,"word-template", "毕业设计（论文）模板-docx.docx")
+        "paper_template_path": os.path.join(SRC_ROOT,"word-template", "毕业设计（论文）模板-docx.docx")
     },
     'trans':{
         "paper_class":TranslationPaper,
-        "paper_template_path": os.path.join(RESOURCE_PATH,"word-template", "外文翻译模板-docx.docx")
+        "paper_template_path": os.path.join(SRC_ROOT,"word-template", "外文翻译模板-docx.docx")
     }
 }
 
