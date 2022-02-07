@@ -15,7 +15,7 @@ import os
 import sys
 
 RESOURCE_PATH = sys.path[0]
-print(RESOURCE_PATH)
+logging.debug(f"package path:{RESOURCE_PATH}")
 
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
@@ -144,10 +144,12 @@ class Component():
     # incr_kw：见上面incr_next
     def render_template(self, anchor_text:str,  incr_next:int, incr_kw, anchor_style_name="")->int:
         offset = DM.get_anchor_position(anchor_text=anchor_text,anchor_style_name=anchor_style_name)
+        i = 0
         while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text\
                  and (offset+incr_next)!=(len(DM.get_doc().paragraphs)-1):
             DM.delete_paragraph_by_index(offset)
-            #print('deleted 1 line for anchor',anchor_text)
+            i = i+1
+        logging.debug("Component:deleted {} lines when rendering template".format(i))
         return self.__internal_text.render_template(offset)
 
 
@@ -494,7 +496,7 @@ class Block(): #content
             self.__content_list.append(content)
         for i in content_list:
             self.__content_list.append(i)
-        #print('added content with len',len(content_list),content_list[0].raw_text,id(self))
+        logging.debug(f"added content")
         return self
 
     # render_template是基于render_block的api，增加了嵌套blocks的渲染 以支持递归生成章节/段落，
@@ -511,7 +513,7 @@ class Block(): #content
             new_offset = new_offset + 1
 
         if self.__title:
-            #print('title:',self.__title,'level:',self.__level)
+            logging.debug(f"block(level={self.__level}) title: {self.__title}")
             p_title = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
             p_title.style = DM.get_doc().styles['Heading '+str(self.__level)]
             p_title.add_run()
@@ -521,7 +523,7 @@ class Block(): #content
         
         new_offset = self.render_block(new_offset)
 
-        #print('has',len(self.__sub_blocks),"sub-blocks")
+        logging.debug(f"this block has {len(self.__sub_blocks)} sub-blocks")
         for i,block in enumerate(self.__sub_blocks):
             new_offset = block.render_template(new_offset) 
 
