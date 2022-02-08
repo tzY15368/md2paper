@@ -1,4 +1,5 @@
 from __future__ import annotations
+from io import BufferedReader, StringIO
 from typing import Union,List,Tuple
 import docx
 from docx.shared import Inches,Cm
@@ -30,15 +31,14 @@ class DocNotSetException(Exception):
     pass
 class DocManager():
     __doc_target = None
-
     @classmethod
-    # doc_target: path-like string or docx.Document
-    def set_doc(cls,doc_target:Union[docx.Document,str]):
+    # doc_target: path-like string, file-like object or docx.Document
+    def set_doc(cls,doc_target:Union[docx.Document,str,BufferedReader]):
         if type(doc_target)==str:
             actual_path = os.path.join(SRC_ROOT,doc_target)
             logging.info(f"reading from template:{actual_path}")
             cls.__doc_target = docx.Document(actual_path)
-        elif type(doc_target)==docx.Document:
+        elif type(doc_target) in [docx.Document, BufferedReader]:
             cls.__doc_target = doc_target
         else:
             raise TypeError(f"invalid doc target: expecting str or docx.Document type,\
@@ -96,8 +96,8 @@ class DocManager():
         element_updatefields.set(f"{namespace}val", "true")
 
     @classmethod
-    def save(cls,out_path:str):
-        cls.__doc_target.save(out_path)
+    def save(cls,out:Union[str,StringIO]):
+        cls.__doc_target.save(out)
 
 DM = DocManager
 
