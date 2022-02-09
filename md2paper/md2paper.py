@@ -1,5 +1,6 @@
 from __future__ import annotations
-from io import BufferedReader, StringIO
+from ast import Bytes
+from io import BytesIO, StringIO
 from typing import Union,List,Tuple
 import docx
 from docx.shared import Inches,Cm
@@ -33,13 +34,15 @@ class DocManager():
     __doc_target = None
     @classmethod
     # doc_target: path-like string, file-like object or docx.Document
-    def set_doc(cls,doc_target:Union[docx.Document,str,BufferedReader]):
+    def set_doc(cls,doc_target:Union[docx.Document,str,BytesIO]):
         if type(doc_target)==str:
             actual_path = os.path.join(SRC_ROOT,doc_target)
             logging.info(f"reading from template:{actual_path}")
             cls.__doc_target = docx.Document(actual_path)
-        elif type(doc_target) in [docx.Document, BufferedReader]:
+        elif type(doc_target) == docx.Document:
             cls.__doc_target = doc_target
+        elif type(doc_target) == BytesIO:
+            cls.__doc_target = docx.Document(doc_target)
         else:
             raise TypeError(f"invalid doc target: expecting str or docx.Document type,\
                  got {type(doc_target)}")
