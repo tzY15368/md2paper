@@ -1,3 +1,4 @@
+from io import BufferedReader, StringIO
 import markdown
 from bs4 import BeautifulSoup, Comment
 import logging
@@ -6,7 +7,7 @@ from functools import reduce
 import os
 import bibtexparser
 from bibtexparser.bparser import BibTexParser
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
@@ -947,14 +948,14 @@ class Paper:
         for part in self.parts:
             part.compile()
 
-    def render(self, doc_path: str, out_path: str):
-        word.DM.set_doc(doc_path)
+    def render(self, doc: Union[str,BufferedReader], out: Union[str,StringIO]):
+        word.DM.set_doc(doc)
 
         for part in self.parts:
             part.render()
 
         word.DM.update_toc()
-        word.DM.save(out_path)
+        word.DM.save(out)
 
 
 class GraduationPaper(Paper):
