@@ -13,7 +13,6 @@ from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
 import md2paper.dut_paper_translation as transword
 
-file_dir = ""
 debug = False
 
 
@@ -130,6 +129,10 @@ class PaperPart:
     def __init__(self):
         self.contents = []
         self.block: word.Component = None
+        self.file_dir: str = ""
+
+    def set_file_dir(self, file_dir: str):
+        self.file_dir = file_dir
 
     # 获取内容
 
@@ -231,8 +234,7 @@ class PaperPart:
         return ps
 
     def _process_img(self, img):
-        global file_dir
-        img_path = os.path.join(file_dir, img["src"])
+        img_path = os.path.join(self.file_dir, img["src"])
         ali, title, ratio = split_title(img["alt"])
         return ("img", {"alias": ali,
                         "title": title,
@@ -617,7 +619,7 @@ class RefPart(PaperPart):
                     if text[0] == "literature":
                         refs += text[1:]
                     elif text[0] == "bib":
-                        bib_path = os.path.join(file_dir, text[1])
+                        bib_path = os.path.join(self.file_dir, text[1])
                         self.bib_path = bib_path
                     else:
                         log_error("这啥? " + i)
@@ -920,14 +922,16 @@ class TransMainPart(PaperPart):
 
 class Paper:
     def __init__(self):
-        self.parts: list[PaperPart]
+        self.parts: list[PaperPart] = []
         self.ref_items: Dict[str, Dict[str, str]] = {}
+        self.file_dir: str = ""
 
     def load_md(self, md_path: str):
         with open(md_path, "r") as f:
             md_file = f.read()
-        global file_dir
-        file_dir = os.path.dirname(md_path)
+        self.file_dir = os.path.dirname(md_path)
+        for part in self.parts:
+            part.set_file_dir(self.file_dir)
         md_html = markdown.markdown(md_file,
                                     tab_length=3,
                                     extensions=['markdown.extensions.tables',
@@ -948,7 +952,7 @@ class Paper:
         for part in self.parts:
             part.compile()
 
-    def render(self, doc: Union[str,BufferedReader], out: Union[str,StringIO]):
+    def render(self, doc: Union[str, BufferedReader], out: Union[str, StringIO]):
         word.DM.set_doc(doc)
 
         for part in self.parts:
