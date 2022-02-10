@@ -82,7 +82,7 @@ async function loadDeps() {
     });
 }
 async function execPaperGen(ftype, fname) {
-
+    $("#msg").text('正在生成……')
     if (ftype !== "grad" && ftype !== "trans") {
         throw new Error("invalid ftype" + ftype)
     }
@@ -125,10 +125,17 @@ async function execPaperGen(ftype, fname) {
     link.download = fileName;
     link.click();
     window.URL.revokeObjectURL(link.href);
+    $("#msg").text('')
 }
 const start = async function () {
+    $("#msg").text('等待依赖加载……时长主要取决于网络状况')
     await init();
     await loadDeps();
+    $("#msg").text('依赖加载完成')
+    $('input[type="file"]').removeAttr("disabled");
+    setTimeout(() => {
+        $("#msg").text('')
+    }, 5000);
 }
 /*
 - 装依赖
