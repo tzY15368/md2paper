@@ -169,16 +169,15 @@ class Run():
         self.__tabstop = tabstop
     
     def render_run(self,run):
-        if not self.formula:
+        if self.formula and self.text:
+            word_math = latex_to_word(self.text)
+            run._element.append(word_math)
+        else:
             run.text = self.text
             run.bold = self.bold
             run.italic = self.italics
             run.font.subscript = self.subscript
             run.font.superscript = self.superscript
-
-        else:
-            word_math = latex_to_word(self.text)
-            run._element.append(word_math)
 
     @classmethod
     def get_tabstop(cls)->Run:
