@@ -1,5 +1,5 @@
 import logging
-from md2paper import *
+from md2paper.md2paper import *
 
 from typing import Dict
 import datetime
@@ -105,8 +105,9 @@ class Metadata(Component):
             DM.get_doc().paragraphs[offset].runs[0].text = text
 
             # 这里如果标题太长导致折行，则额外删去一行，以防止封面溢出到第二页
-            if self.__get_data_len(text) > mapping[field]['max_len']:
-                DM.delete_paragraph_by_index(offset + 4)
+            logging.debug(f"metadata:text len = {self.__get_data_len(text)}, max len ={mapping[field]['max_len']}")
+            if self.__get_data_len(text) >= mapping[field]['max_len']:
+                DM.delete_paragraph_by_index(offset + 5)
 
         mapping = self.get_line_mapping()
         for field in mapping:

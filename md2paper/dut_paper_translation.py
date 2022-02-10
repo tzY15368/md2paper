@@ -1,6 +1,6 @@
 from typing import Dict
-from md2paper import *
-from dut_paper import MainContent, Metadata
+from md2paper.md2paper import *
+from md2paper.dut_paper import MainContent, Metadata
 import logging
 """
 外文翻译要求：

@@ -1,4 +1,6 @@
 from __future__ import annotations
+from ast import Bytes
+from io import BytesIO, StringIO
 from typing import Union,List,Tuple
 import docx
 from docx.shared import Inches,Cm
@@ -11,12 +13,16 @@ from lxml import etree
 import latex2mathml.converter
 from PIL import Image as PILImage
 import logging
+import os
+import sys
 
+SRC_ROOT = os.path.split(os.path.split(os.path.abspath(__file__))[0])[0]
+logging.debug(f"resource root:{SRC_ROOT}")
 def latex_to_word(latex_input):
     mathml = latex2mathml.converter.convert(latex_input)
     tree = etree.fromstring(mathml)
     xslt = etree.parse(
-        'mml2omml.xsl'
+        os.path.join(SRC_ROOT,'md2paper','mml2omml.xsl')
         )
     transform = etree.XSLT(xslt)
     new_dom = transform(tree)
@@ -26,10 +32,20 @@ class DocNotSetException(Exception):
     pass
 class DocManager():
     __doc_target = None
-
     @classmethod
-    def set_doc(cls,doc_target:docx.Document):
-        cls.__doc_target = doc_target
+    # doc_target: path-like string, file-like object or docx.Document
+    def set_doc(cls,doc_target:Union[docx.Document,str,BytesIO]):
+        if type(doc_target)==str:
+            actual_path = os.path.join(SRC_ROOT,doc_target)
+            logging.info(f"reading from template:{actual_path}")
+            cls.__doc_target = docx.Document(actual_path)
+        elif type(doc_target) == docx.Document:
+            cls.__doc_target = doc_target
+        elif type(doc_target) == BytesIO:
+            cls.__doc_target = docx.Document(doc_target)
+        else:
+            raise TypeError(f"invalid doc target: expecting str or docx.Document type,\
+                 got {type(doc_target)}")
         cls.__clear_tables()
 
     @classmethod
@@ -82,6 +98,10 @@ class DocManager():
         )
         element_updatefields.set(f"{namespace}val", "true")
 
+    @classmethod
+    def save(cls,out:Union[str,StringIO]):
+        cls.__doc_target.save(out)
+
 DM = DocManager
 
 class BaseContent():
@@ -126,10 +146,12 @@ class Component():
     # incr_kw：见上面incr_next
     def render_template(self, anchor_text:str,  incr_next:int, incr_kw, anchor_style_name="")->int:
         offset = DM.get_anchor_position(anchor_text=anchor_text,anchor_style_name=anchor_style_name)
+        i = 0
         while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text\
                  and (offset+incr_next)!=(len(DM.get_doc().paragraphs)-1):
             DM.delete_paragraph_by_index(offset)
-            #print('deleted 1 line for anchor',anchor_text)
+            i = i+1
+        logging.debug("Component:deleted {} lines when rendering template".format(i))
         return self.__internal_text.render_template(offset)
 
 
@@ -213,12 +235,19 @@ class ImageData():
         self.img_src = src
         self.img_alt = alt
 
+        self.dpi = 360
+        self.MAX_WIDTH_INCHES = 6
+
+        if not self.img_src:
+            self.size = (0,0)
+            self.size_inches = (0,0)
+            logging.debug("empty image, alt={}".format(self.img_alt))
+            return
+            
         img = PILImage.open(self.img_src)
         self.size = img.size
         img.close()
 
-        self.dpi = 360
-        self.MAX_WIDTH_INCHES = 6
         img_size_ratio = self.size[0]/self.size[1]
         if width_ratio < 0 or width_ratio > 1 :
             raise ValueError("invalid image width ratio, expecting range[0,1]")
@@ -231,7 +260,7 @@ class ImageData():
             if result[0] > self.MAX_WIDTH_INCHES:
                 result = (self.MAX_WIDTH_INCHES,self.MAX_WIDTH_INCHES/img_size_ratio)
             self.size_inches = result
-        logging.debug("image size:",self.size_inches)
+        logging.debug(f"image size:{self.size_inches[0]},{self.size_inches[1]}")
 
     # returns width,height in Inches
     def get_size_in_doc(self)->Tuple[Inches]:
@@ -476,7 +505,7 @@ class Block(): #content
             self.__content_list.append(content)
         for i in content_list:
             self.__content_list.append(i)
-        #print('added content with len',len(content_list),content_list[0].raw_text,id(self))
+        logging.debug(f"added content")
         return self
 
     # render_template是基于render_block的api，增加了嵌套blocks的渲染 以支持递归生成章节/段落，
@@ -493,7 +522,7 @@ class Block(): #content
             new_offset = new_offset + 1
 
         if self.__title:
-            #print('title:',self.__title,'level:',self.__level)
+            logging.debug(f"block(level={self.__level}) title: {self.__title}")
             p_title = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
             p_title.style = DM.get_doc().styles['Heading '+str(self.__level)]
             p_title.add_run()
@@ -503,7 +532,7 @@ class Block(): #content
         
         new_offset = self.render_block(new_offset)
 
-        #print('has',len(self.__sub_blocks),"sub-blocks")
+        logging.debug(f"this block has {len(self.__sub_blocks)} sub-blocks")
         for i,block in enumerate(self.__sub_blocks):
             new_offset = block.render_template(new_offset) 
 

@@ -3,6 +3,16 @@
 基于markdown模板生成符合中文论文要求格式的docx文档  
 generate thesis paper with certain format in docx from markdown
 
+## 使用方法
+
+依据 `requirements.txt` 安装 python 依赖。
+
+参考 `example/` 编写 Markdown 文档，参考执行 `example.sh` 转换为 Word。
+
+**注意**
+本项目无法保证生成文档严格符合模板全部格式要求，
+请及时检查生成的 Word 格式是否符合预期。
+
 ## 主要解决的问题
 
 原有word模板没有正确使用word提供的编号、格式以及ref机制，且压缩保存的word文档不易版本控制。此外，latex难以生成完美符合格式要求的终产物。
