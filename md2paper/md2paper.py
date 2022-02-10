@@ -312,20 +312,21 @@ class Formula(BaseContent):
         DM.delete_paragraph_by_index(new_offset)
 
         # 公式cell
-        cell_formula = table.rows[0].cells[1]
-        cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        empty = {'color':Table.white}
-        Table.set_cell_border(
-            cell_formula,
-            top=empty,
-            bottom=empty,
-            start=empty,
-            end=empty
-        )
-        _p = cell_formula.paragraphs[0]
-        _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r = _p.add_run()
-        Run(self.__formula,Run.Formula).render_run(r)
+        if self.__title:
+            cell_formula = table.rows[0].cells[1]
+            cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            empty = {'color':Table.white}
+            Table.set_cell_border(
+                cell_formula,
+                top=empty,
+                bottom=empty,
+                start=empty,
+                end=empty
+            )
+            _p = cell_formula.paragraphs[0]
+            _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            r = _p.add_run()
+            Run(self.__formula,Run.Formula).render_run(r)
 
         # 标号cell
         cell_idx = table.rows[0].cells[2]
