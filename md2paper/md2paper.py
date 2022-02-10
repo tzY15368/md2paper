@@ -172,16 +172,15 @@ class Run():
         self.__tabstop = tabstop
     
     def render_run(self,run):
-        if not self.formula:
+        if self.formula and self.text:
+            word_math = latex_to_word(self.text)
+            run._element.append(word_math)
+        else:
             run.text = self.text
             run.bold = self.bold
             run.italic = self.italics
             run.font.subscript = self.subscript
             run.font.superscript = self.superscript
-
-        else:
-            word_math = latex_to_word(self.text)
-            run._element.append(word_math)
 
     @classmethod
     def get_tabstop(cls)->Run:
@@ -315,20 +314,21 @@ class Formula(BaseContent):
         DM.delete_paragraph_by_index(new_offset)
 
         # 公式cell
-        cell_formula = table.rows[0].cells[1]
-        cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        empty = {'color':Table.white}
-        Table.set_cell_border(
-            cell_formula,
-            top=empty,
-            bottom=empty,
-            start=empty,
-            end=empty
-        )
-        _p = cell_formula.paragraphs[0]
-        _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r = _p.add_run()
-        Run(self.__formula,Run.Formula).render_run(r)
+        if self.__title:
+            cell_formula = table.rows[0].cells[1]
+            cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            empty = {'color':Table.white}
+            Table.set_cell_border(
+                cell_formula,
+                top=empty,
+                bottom=empty,
+                start=empty,
+                end=empty
+            )
+            _p = cell_formula.paragraphs[0]
+            _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            r = _p.add_run()
+            Run(self.__formula,Run.Formula).render_run(r)
 
         # 标号cell
         cell_idx = table.rows[0].cells[2]

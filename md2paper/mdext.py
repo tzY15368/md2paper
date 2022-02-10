@@ -48,7 +48,7 @@ class MDExt(Extension):
         md.inlinePatterns.register(ref_tag, 'ref', 75)
 
         md.parser.blockprocessors.register(
-            MathBlockProcessor(md.parser), 'math', 175)
+            MathBlockProcessor(md.parser), 'math', 75)
 
 
 if __name__ == "__main__":
