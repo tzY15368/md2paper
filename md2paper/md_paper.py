@@ -1,4 +1,4 @@
-from io import BufferedReader, StringIO
+from io import BufferedReader, BytesIO, StringIO
 import markdown
 from bs4 import BeautifulSoup, Comment
 import logging
