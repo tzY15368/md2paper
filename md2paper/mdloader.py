@@ -75,26 +75,6 @@ def assemble_ps(ps):
     return reduce(lambda x, y: x+"\n"+y, strs)
 
 
-def split_title(title: str):
-    assert_error(len(title.split(':')) >= 2, "应该有别名或者标题: " + title)
-    sp = title.split(':')
-    if len(sp) == 2:
-        ali = sp[0]
-        ratio = 0
-        title = rbk(sp[1])
-    elif len(sp) == 3:
-        ali = sp[0]
-        ratio_s = rbk(sp[1])
-        ratio = int(ratio_s[:-1])
-        assert_warning(0 < ratio <= 100,
-                       "图片占页面宽度应该在 [0%, 100%] 间, 0% 或不设置宽度为自动宽度: " + title)
-        title = rbk(sp[2])
-    else:
-        log_error("应该有别名或者标题: " + title)
-
-    return ali, title, ratio/100
-
-
 def ref_items_list_unfold(ref_items_list: list):
     unfold_ref_items = {}
     for ref_items in ref_items_list:
@@ -235,7 +215,7 @@ class PaperPart:
 
     def _process_img(self, img):
         img_path = os.path.join(self.file_dir, img["src"])
-        ali, title, ratio = split_title(img["alt"])
+        ali, title, ratio = self._split_title(img["alt"])
         return ("img", {"alias": ali,
                         "title": title,
                         "ratio": ratio,
@@ -269,7 +249,7 @@ class PaperPart:
                 else:
                     data.append(word.Row(row))
 
-        ali, title, _ = split_title(title)
+        ali, title, _ = self._split_title(title)
         return ("table", {"alias": ali,
                           "title": title,
                           "data": data})
@@ -303,6 +283,28 @@ class PaperPart:
         return ("math", {"alias": title,
                          "title": "",
                          "text": math.text})
+
+    def _split_title(self, title: str):
+        sp = title.split(':')
+        sp = [sp[0]] + sp[1].split(';')
+        if len(sp) == 2:
+            ali = sp[0]
+            title = rbk(sp[1])
+            ratio = 0
+        elif len(sp) == 3:
+            ali = sp[0]
+            title = rbk(sp[1])
+            ratio_s = rbk(sp[2])
+            if ratio_s != "":
+                ratio = int(ratio_s[:-1])
+            else:
+                ratio = 0
+            assert_warning(0 <= ratio <= 100,
+                           "图片占页面宽度应该在 [0%, 100%] 间: " + title)
+        else:
+            log_error("图、表的标题格式错误: " + title)
+
+        return ali, title, ratio/100
 
     # 处理
 
