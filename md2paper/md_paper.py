@@ -46,7 +46,7 @@ def rbk(text: str):  # remove_blank
     text = text.replace("\r", "")
     text = text.strip(' ')
 
-    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’\u0061]'
+    cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’\u00a0]'
     # 中文字符后空格
     should_replace_list = re.compile(
         cn_char + u' +').findall(text)
@@ -57,8 +57,9 @@ def rbk(text: str):  # remove_blank
     for i in should_replace_list:
         if i == u' ':
             continue
-        new_i = i.strip()
+        new_i = i.strip(" ")
         text = text.replace(i, new_i)
+    text = text.replace("\u00a0", " ")  # 替换为普通空格
     return text
 
 
