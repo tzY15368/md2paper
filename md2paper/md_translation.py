@@ -5,7 +5,30 @@ import md2paper.dut_paper_translation as transword
 
 # 论文模块
 
-class TransMetaPart(PaperPart):
+class TranslationPart(PaperPart):
+    def _split_title(self, title: str):
+        sp = title.split(';')
+        if len(sp) == 1:
+            ali = ""
+            title = rbk(sp[0])
+            ratio = 0
+        elif len(sp) == 2:
+            ali = ""
+            title = rbk(sp[0])
+            ratio_s = rbk(sp[1])
+            if ratio_s != "":
+                ratio = int(ratio_s[:-1])
+            else:
+                ratio = 0
+            assert_warning(0 <= ratio <= 100,
+                           "图片占页面宽度应该在 [0%, 100%] 间: " + title)
+        else:
+            log_error("图、表的标题格式错误: " + title)
+
+        return ali, title, ratio/100
+
+
+class TransMetaPart(TranslationPart):
     def load_contents(self, soup: BeautifulSoup):
         mete_h1 = soup.find("h1")
 
@@ -48,7 +71,7 @@ class TransMetaPart(PaperPart):
         self.block.finish_date = self.finish_date
 
 
-class TransAbsPart(PaperPart):
+class TransAbsPart(TranslationPart):
     def load_contents(self, soup: BeautifulSoup):
         # 摘要
         abs_cn_h1 = soup.find("h1", string=re_space("摘要"))
@@ -74,7 +97,7 @@ class TransAbsPart(PaperPart):
         self.block.add_keywords(self.keywords_zh_CN)
 
 
-class TransMainPart(PaperPart):
+class TransMainPart(TranslationPart):
     def load_contents(self, soup: BeautifulSoup):
         main_h1 = soup.find("h1", string=re_space("正文"))
         conts = self._get_content_from(main_h1.next_sibling)

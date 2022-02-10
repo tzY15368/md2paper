@@ -213,7 +213,10 @@ class PaperPart:
         return ps
 
     def _process_img(self, img):
-        img_path = os.path.join(self.file_dir, img["src"])
+        if img["src"] == "":
+            img_path = ""
+        else:
+            img_path = os.path.join(self.file_dir, img["src"])
         ali, title, ratio = self._split_title(img["alt"])
         return ("img", {"alias": ali,
                         "title": title,
