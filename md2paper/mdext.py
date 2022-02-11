@@ -1,10 +1,15 @@
 from functools import reduce
-from markdown.extensions import Extension
-from markdown.inlinepatterns import SimpleTagPattern
-from markdown.blockprocessors import BlockProcessor
-import xml.etree.ElementTree as etree
 import markdown
+from markdown.extensions import Extension
+from markdown.inlinepatterns import InlineProcessor
+from markdown.blockprocessors import BlockProcessor
+from markdown.util import AtomicString
+import xml.etree.ElementTree as etree
+from xml.etree.ElementTree import Element
 import re
+from typing import *
+
+from markdown.inlinepatterns import SimpleTagPattern
 
 
 class MathBlockProcessor(BlockProcessor):
@@ -24,7 +29,8 @@ class MathBlockProcessor(BlockProcessor):
                 blocks[block_num] = re.sub(self.RE_FENCE_END, '', block)
                 # render fenced area inside a new div
                 e = etree.SubElement(parent, 'math')
-                e.text = reduce(lambda x, y: x+'\n'+y, blocks[0:block_num + 1])
+                e.text = AtomicString(
+                    reduce(lambda x, y: x+'\n'+y, blocks[0:block_num + 1]))
                 #self.parser.parseBlocks(e, blocks[0:block_num + 1])
                 # remove used blocks
                 for i in range(0, block_num + 1):
@@ -35,20 +41,35 @@ class MathBlockProcessor(BlockProcessor):
         return False  # equivalent to our test() routine returning False
 
 
-class MDExt(Extension):
-    MATH_INLINE_RE = r'(\$)(.*?)\$'
-    REF_RE = r'(\[)(.*?)\]'
+class RawTextPattern(InlineProcessor):
+    def __init__(self, pattern, tag: str) -> None:
+        super().__init__(pattern)
+        self._tag = tag
 
+    def handleMatch(self, m, data):
+        node = Element(self._tag)
+        # Text should not be further processed.
+        node.text = AtomicString(m.group(2))
+        return node, m.start(0), m.end(0)
+
+
+class MDExt(Extension):
     def extendMarkdown(self, md):
-        # Create the del pattern
-        math_inline_tag = SimpleTagPattern(self.MATH_INLINE_RE, 'math-inline')
-        ref_tag = SimpleTagPattern(self.REF_RE, 'ref')
-        # Insert del pattern into markdown parser
-        md.inlinePatterns.register(math_inline_tag, 'math-inline', 75)
+        ref_tag = SimpleTagPattern(r'(\[)(.*?)\]', 'ref')
         md.inlinePatterns.register(ref_tag, 'ref', 75)
 
+        md.inlinePatterns.register(
+            RawTextPattern(r'(?<!\\|\$)(\$)([^\$]+)(\$)',  # $...$
+                           'math-inline'),
+            'math-inline',
+            185)
+
         md.parser.blockprocessors.register(
-            MathBlockProcessor(md.parser), 'math', 75)
+            MathBlockProcessor(md.parser),
+            'math',
+            75)
+
+        md.ESCAPED_CHARS.append('$')
 
 
 if __name__ == "__main__":
@@ -65,7 +86,11 @@ $$
 
 inline $a$ formula
 
-[引用]
+[\{引用]
+
+[a](b)
+
+![a](b)
 
     '''
     a = markdown.markdown(md, extensions=[MDExt()])
