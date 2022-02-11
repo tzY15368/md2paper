@@ -272,25 +272,28 @@ class Image(BaseContent):
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
         for img in self.__images:
+            DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            new_offset = new_offset + 1
+            
             p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+            new_offset = new_offset + 1
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER 
             p.style = DM.get_doc().styles['图名中文']
-            # 先换一行
-            r0 = p.add_run()
-            r0.add_break(WD_BREAK.LINE)
             if img.img_src:
                 r = p.add_run()
                 r.add_picture(img.img_src,*img.get_size_in_doc())
-                r2 = p.add_run()
-                r2.add_break(WD_BREAK.LINE)
-            r3 = p.add_run()
-            r3.add_text("\n"+img.img_alt)
-            # 结尾再换
-            r4 = p.add_run()
-            r4.add_break(WD_BREAK.LINE)
 
-            new_offset = new_offset + 1
+                p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+                new_offset = new_offset + 1
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+                p.style = DM.get_doc().styles['图名中文']
+            
+            p.add_run().add_text(img.img_alt)
         
+        # 结尾再换
+        DM.get_paragraph(new_offset).insert_paragraph_before()
+        new_offset = new_offset + 1
+
         return new_offset
 
 # Row of Table
@@ -354,26 +357,24 @@ class Table(BaseContent):
     
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
+        # 先换一行
+        DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        new_offset = new_offset + 1
         p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
+        new_offset = new_offset + 1
         p1.alignment = WD_ALIGN_PARAGRAPH.CENTER 
         p1.style = DM.get_doc().styles['图名中文']
         # 先换一行
-        r0 = p1.add_run()
-        r0.add_break(WD_BREAK.LINE)
-        
-        r1 = p1.add_run()
-        r1.add_text(self.__title)
-        new_offset = new_offset + 1
+        p1.add_run().add_text(self.__title)
 
         p2 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
-        # 表格自带一个换行？
         table = DM.get_doc().add_table(rows = self.__rows, cols = self.__cols, style='Table Grid')
         # 将table挪到paragrpah里
         p2._p.addnext(table._tbl)
         # 挪完删掉paragraph
         DM.delete_paragraph_by_index(new_offset)
         
-        new_offset = new_offset + 1
+        #new_offset = new_offset + 1
         
         # 结尾再换
         p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
