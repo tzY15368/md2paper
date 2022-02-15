@@ -19,14 +19,7 @@ import sys
 SRC_ROOT = os.path.split(os.path.split(os.path.abspath(__file__))[0])[0]
 logging.debug(f"resource root:{SRC_ROOT}")
 def latex_to_word(latex_input):
-    mathml = latex2mathml.converter.convert(latex_input)
-    tree = etree.fromstring(mathml)
-    xslt = etree.parse(
-        os.path.join(SRC_ROOT,'md2paper','mml2omml.xsl')
-        )
-    transform = etree.XSLT(xslt)
-    new_dom = transform(tree)
-    return new_dom.getroot()
+    return etree.fromstring(latex_input)
 
 class DocNotSetException(Exception):
     pass
