@@ -552,8 +552,9 @@ class Block(): #content
         for i,content in enumerate(self.__content_list):
             new_offset = content.render_paragraph(new_offset)
             _media_types = [Image,Formula,Table]
-            if i <len(self.__content_list)-2 and type(content) in _media_types and type(self.__content_list[i+1]) in _media_types:
+            if i <len(self.__content_list)-1 and type(content) in _media_types and type(self.__content_list[i+1]) in _media_types:
                 # 多媒体内容之间也只空一行
                 DM.delete_paragraph_by_index(new_offset)
+                new_offset = new_offset - 1
 
         return new_offset
