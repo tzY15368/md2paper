@@ -71,7 +71,8 @@ But if you know for sure none of those are present, these few lines should get t
     txt.add_run(Run("italic and bold",Run.Italics|Run.Bold))
     images = Image([
         ImageData("classes.png","图1：these are the classes"),
-        ImageData("classes.png","图2:asldkfja;sldkf",width_ratio=0.5)
+        ImageData("classes.png","图2:asldkfja;sldkf",width_ratio=0.5),
+        ImageData("","图3：kongtu")
     ])
     formula = Formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN")
     more_text = Text().add_run(Run("only italics",Run.Italics))
