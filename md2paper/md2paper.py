@@ -1,5 +1,5 @@
 from __future__ import annotations
-from ast import Bytes, For
+from ast import Bytes
 from io import BytesIO, StringIO
 from typing import Union,List,Tuple
 import docx
