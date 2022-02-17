@@ -1,5 +1,5 @@
 from __future__ import annotations
-from ast import Bytes
+from ast import Bytes, For
 from io import BytesIO, StringIO
 from typing import Union,List,Tuple
 import docx
@@ -549,6 +549,11 @@ class Block(): #content
         if not self.__content_list:
             return offset
         new_offset = offset
-        for content in self.__content_list:
+        for i,content in enumerate(self.__content_list):
             new_offset = content.render_paragraph(new_offset)
+            _media_types = [Image,Formula,Table]
+            if i <len(self.__content_list)-2 and type(content) in _media_types and type(self.__content_list[i+1]) in _media_types:
+                # 多媒体内容之间也只空一行
+                DM.delete_paragraph_by_index(new_offset)
+
         return new_offset
