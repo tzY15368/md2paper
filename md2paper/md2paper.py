@@ -332,10 +332,11 @@ class Row():
 
 
 class Formula(BaseContent):
-    def __init__(self, title: str, formula: str) -> None:
+    def __init__(self, title: str, formula: str, transform_required: bool = True) -> None:
         super().__init__()
         self.__title: str = title
         self.__formula: str = formula
+        self.__transform_required = transform_required
 
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
@@ -360,7 +361,8 @@ class Formula(BaseContent):
             _p = cell_formula.paragraphs[0]
             _p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             r = _p.add_run()
-            Run(self.__formula, Run.Formula).render_run(r)
+            Run(self.__formula, Run.Formula,
+                transform_required=self.__transform_required).render_run(r)
 
         # 标号cell
         cell_idx = table.rows[0].cells[2]
