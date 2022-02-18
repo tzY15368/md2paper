@@ -254,6 +254,7 @@ class RefPart(PaperPart):
         return ref_map
 
     def compile(self):
+        super().compile()
         ref_map = self._load_bib()
         for ref in ref_map:
             assert_warning(ref not in self.ref_map,

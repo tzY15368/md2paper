@@ -1,4 +1,4 @@
-from io import BufferedReader, BytesIO, StringIO
+from io import BytesIO, StringIO
 import markdown
 from bs4 import BeautifulSoup, Comment
 import logging
@@ -8,7 +8,9 @@ import os
 import bibtexparser
 from bibtexparser.bparser import BibTexParser
 from typing import Dict, List, Union
-
+import pypandoc
+import docx
+import tempfile
 from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
 
@@ -182,6 +184,8 @@ class PaperPart:
         data = []
         for i in p.children:
             if i.name == None:
+                if not hasattr(i, "text"):
+                    setattr(i, "text", str(i))
                 if i.text == "\n":
                     continue
                 data.append({"type": "text", "text": rbk(i.text)})
@@ -258,6 +262,8 @@ class PaperPart:
                           "data": data})
 
     def _process_lis(self, li, level):
+        if not hasattr(li.contents[0], "text"):
+            setattr(li.contents[0], "text", str(li.contents[0]))
         if (li.contents[0].text == "\n"):  # <p>
             conts = self._get_content_from(li.contents[0], level+1)
         else:  # text
@@ -313,7 +319,55 @@ class PaperPart:
 
     def check(self): pass
 
-    def compile(self): pass
+    def _math_pandoc_word(self):
+        tmp_fp = tempfile.NamedTemporaryFile(delete=False)
+        tmp_fp.close()
+        # get math
+        math_list: List[str] = []
+        for name, cont in self.contents:
+            if name == "p":
+                for run in cont:
+                    if run["type"] == "math-inline" and run["text"].strip() != "":
+                        math_list.append(run["text"])
+            elif name == "math" and cont["text"].strip() != "":
+                math_list.append(cont["text"])
+
+        # get word
+        if math_list == []:
+            return
+        md_list = ["${}$".format(i.strip()) for i in math_list]
+        md = reduce(lambda x, y: x+'\n\n'+y, md_list)
+        pypandoc.convert_text(md, "docx", "md", outputfile=tmp_fp.name)
+        doc = docx.Document(tmp_fp.name)
+        paras_xml = [str(i._element.xml) for i in doc.paragraphs]
+        os.unlink(tmp_fp.name)
+        oMath_head = "<m:oMath>"
+        oMath_tail = "</m:oMath>"
+        word_maths = [para_xml[para_xml.find(oMath_head):
+                               para_xml.find(oMath_tail) + len(oMath_tail)]
+                      for para_xml in paras_xml]
+        word_maths_m: List[str] = []
+        for word_math in word_maths:
+            pos = word_math.find('>')
+            word_math = word_math[:pos] + \
+                ' xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"' + \
+                word_math[pos:]
+            word_maths_m.append(word_math)
+
+        # put back
+        count = 0
+        for name, cont in self.contents:
+            if name == "p":
+                for run in cont:
+                    if run["type"] == "math-inline" and run["text"].strip() != "":
+                        run["text"] = word_maths_m[count]
+                        count += 1
+            elif name == "math" and cont["text"].strip() != "":
+                cont["text"] = word_maths_m[count]
+                count += 1
+
+    def compile(self):
+        self._math_pandoc_word()
 
     def _get_ref_items(self, conts, index_prefix: str = "") -> Dict[str, RefItem]:
         def get_index(index_prefix: str, chapter_cnt: int, item_cnt: int):
@@ -513,7 +567,7 @@ class Paper:
         for part in self.parts:
             part.compile()
 
-    def render(self, doc: Union[str, BufferedReader], out: Union[str, StringIO]):
+    def render(self, doc: Union[str, BytesIO], out: Union[str, StringIO]):
         word.DM.set_doc(doc)
 
         for part in self.parts:
