@@ -313,7 +313,7 @@ class Formula(BaseContent):
         self.__formula:str = formula
         
     def render_paragraph(self,offset: int) -> int:
-        print(self.__title,self.__formula)
+        logging.debug("rendering formula `{}`: {}".format(self.__title,self.__formula))
         new_offset = offset
         p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER

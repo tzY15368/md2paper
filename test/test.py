@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append('..')
 import logging
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 from md2paper import *
 
 if __name__ == "__main__":
