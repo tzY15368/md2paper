@@ -1,4 +1,4 @@
-from io import BufferedReader, BytesIO, StringIO
+from io import BytesIO, StringIO
 import markdown
 from bs4 import BeautifulSoup, Comment
 import logging
@@ -184,6 +184,8 @@ class PaperPart:
         data = []
         for i in p.children:
             if i.name == None:
+                if not hasattr(i,"text"):
+                    setattr(i,"text",str(i))
                 if i.text == "\n":
                     continue
                 data.append({"type": "text", "text": rbk(i.text)})
@@ -260,6 +262,8 @@ class PaperPart:
                           "data": data})
 
     def _process_lis(self, li, level):
+        if not hasattr(li.contents[0],"text"):
+            setattr(li.contents[0],"text",str(li.contents[0]))
         if (li.contents[0].text == "\n"):  # <p>
             conts = self._get_content_from(li.contents[0], level+1)
         else:  # text
@@ -564,7 +568,7 @@ class Paper:
         for part in self.parts:
             part.compile()
 
-    def render(self, doc: Union[str, BufferedReader], out: Union[str, StringIO]):
+    def render(self, doc: Union[str, BytesIO], out: Union[str, StringIO]):
         word.DM.set_doc(doc)
 
         for part in self.parts:
