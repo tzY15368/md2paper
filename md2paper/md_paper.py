@@ -10,7 +10,7 @@ from bibtexparser.bparser import BibTexParser
 from typing import Dict, List, Union
 import pypandoc
 import docx
-
+import tempfile
 from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
 
@@ -184,8 +184,8 @@ class PaperPart:
         data = []
         for i in p.children:
             if i.name == None:
-                if not hasattr(i,"text"):
-                    setattr(i,"text",str(i))
+                if not hasattr(i, "text"):
+                    setattr(i, "text", str(i))
                 if i.text == "\n":
                     continue
                 data.append({"type": "text", "text": rbk(i.text)})
@@ -262,8 +262,8 @@ class PaperPart:
                           "data": data})
 
     def _process_lis(self, li, level):
-        if not hasattr(li.contents[0],"text"):
-            setattr(li.contents[0],"text",str(li.contents[0]))
+        if not hasattr(li.contents[0], "text"):
+            setattr(li.contents[0], "text", str(li.contents[0]))
         if (li.contents[0].text == "\n"):  # <p>
             conts = self._get_content_from(li.contents[0], level+1)
         else:  # text
@@ -320,8 +320,8 @@ class PaperPart:
     def check(self): pass
 
     def _math_pandoc_word(self):
-        tmp_doc = "**tmp**.docx"
-
+        tmp_fp = tempfile.NamedTemporaryFile(delete=False)
+        tmp_fp.close()
         # get math
         math_list: List[str] = []
         for name, cont in self.contents:
@@ -337,11 +337,10 @@ class PaperPart:
             return
         md_list = ["${}$".format(i.strip()) for i in math_list]
         md = reduce(lambda x, y: x+'\n\n'+y, md_list)
-        pypandoc.convert_text(md, "docx", "md", outputfile=tmp_doc)
-        doc = docx.Document(tmp_doc)
+        pypandoc.convert_text(md, "docx", "md", outputfile=tmp_fp.name)
+        doc = docx.Document(tmp_fp.name)
         paras_xml = [str(i._element.xml) for i in doc.paragraphs]
-        os.remove(tmp_doc)
-
+        os.unlink(tmp_fp.name)
         oMath_head = "<m:oMath>"
         oMath_tail = "</m:oMath>"
         word_maths = [para_xml[para_xml.find(oMath_head):
