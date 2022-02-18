@@ -16,70 +16,71 @@ import logging
 7．特殊情况应在译文后附件说明。 
 """
 
+
 class TranslationMetadata(Metadata):
 
     def get_title_mapping(self) -> Dict[str, str]:
         data = {
-            "外文的中文题目":{
-                "text":self.title_zh_CN,
-                "max_len":38
+            "外文的中文题目": {
+                "text": self.title_zh_CN,
+                "max_len": 38
             },
-            "The title of foreign language":{
-                "text":self.title_en,
-                "max_len":66
+            "The title of foreign language": {
+                "text": self.title_en,
+                "max_len": 66
             },
         }
         return data
 
-    def get_line_mapping(self)->Dict[str,str]:
+    def get_line_mapping(self) -> Dict[str, str]:
         data = {
-            "学 部（院）：":self.school,
-            "专       业：":self.major,
-            "学 生 姓 名：":self.name,
-            "学       号：":self.number,
-            "指 导 教 师：":self.teacher,
-            "完 成 日 期：":self.finish_date
+            "学 部（院）：": self.school,
+            "专       业：": self.major,
+            "学 生 姓 名：": self.name,
+            "学       号：": self.number,
+            "指 导 教 师：": self.teacher,
+            "完 成 日 期：": self.finish_date
         }
         return data
+
 
 class TranslationAbstract(Component):
-    def __init__(self,title_zh_CN:str,author_en:str,work_place:str) -> None:
+    def __init__(self, title_zh_CN: str, author_en: str, work_place: str) -> None:
         super().__init__()
         self.author_en = author_en
         self.work_place = work_place
         self.title_zh_CN = title_zh_CN
-        self.keywords:List[str] = []
+        self.keywords: List[str] = []
 
-    def add_keywords(self, keywords:List[str]):
+    def add_keywords(self, keywords: List[str]):
         self.keywords += keywords
 
-    def render_template(self)->int:
+    def render_template(self) -> int:
         new_offset = DM.get_anchor_position(anchor_text="翻译外文的中文题目") - 1
         DM.get_paragraph(new_offset).runs[0].text = self.title_zh_CN
         for run in DM.get_paragraph(new_offset).runs[1:]:
             run.text = ""
         new_offset += 1
 
-        
         DM.get_paragraph(new_offset).runs[0].text = self.author_en
         for run in DM.get_paragraph(new_offset).runs[1:]:
             run.text = ""
         new_offset += 1
 
-        
         DM.get_paragraph(new_offset).runs[0].text = self.work_place
         for run in DM.get_paragraph(new_offset).runs[1:]:
             run.text = ""
         new_offset += 1
 
-
-        abstract_start= "摘要："
+        abstract_start = "摘要："
         DM.get_paragraph(new_offset).runs[0].text = abstract_start
         new_offset += 1
 
         incr_kw = "关键词：(黑体、小四、加粗)"
-        new_offset = super().render_template(anchor_text=abstract_start,incr_kw=incr_kw,incr_next=0)
-        DM.get_paragraph(new_offset).runs[0].text = f"关键词：{'；'.join(self.keywords)}"
+        new_offset = super().render_template(
+            anchor_text=abstract_start, incr_kw=incr_kw, incr_next=0)
+        DM.get_paragraph(
+            new_offset).runs[0].text = f"关键词：{'；'.join(self.keywords)}"
         new_offset += 1
 
         # hack: 最后给正文预留锚点
@@ -97,6 +98,7 @@ class TranslationAbstract(Component):
         while new_offset != len(DM.get_doc().paragraphs):
             DM.delete_paragraph_by_index(new_offset)
         return new_offset
+
 
 class TranslationMainContent(MainContent):
     def render_template(self) -> int:
