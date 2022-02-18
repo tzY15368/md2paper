@@ -288,7 +288,7 @@ class PaperPart:
 
     def _process_math(self, title, math):
         return ("math", {"alias": title,
-                         "title": "",
+                         "title": title,
                          "text": math.text})
 
     def _split_title(self, title: str):
