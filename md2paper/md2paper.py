@@ -176,18 +176,21 @@ class Run():
     Superscript = 16
     Subscript = 32
 
-    def __init__(self, text: str, style: int = 0, tabstop: bool = False) -> None:
+    def __init__(self, text: str, style: int = 0, tabstop: bool = False, transform_required: bool = True) -> None:
         self.text = text
         self.bold = style & self.Bold != 0
         self.italics = style & self.Italics != 0
         self.formula = style & self.Formula != 0
+        # transform rquired为true，则使用内置的xslt样式表，否则使用pandoc（需要pandoc依赖）
+        self.__transform_required = transform_required
         self.subscript = style & self.Subscript != 0
         self.superscript = style & self.Superscript != 0
         self.__tabstop = tabstop
 
     def render_run(self, run):
         if self.formula and self.text:
-            word_math = latex_to_word(self.text)
+            word_math = latex_to_word(
+                self.text, transform_required=self.__transform_required)
             run._element.append(word_math)
         else:
             run.text = self.text
