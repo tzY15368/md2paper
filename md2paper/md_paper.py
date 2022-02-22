@@ -90,8 +90,16 @@ def ref_items_list_unfold(ref_items_list: list):
 def re_space(s: str):
     return re.compile("^ *{} *".format(s))
 
-# 数据类型
 
+def check_pandoc() -> bool:
+    try:
+        pypandoc._ensure_pandoc_path(quiet=True)
+    except OSError:
+        return False
+    return True
+
+
+# 数据类型
 
 class RefItem:
     IMG = "img"
@@ -198,7 +206,9 @@ class PaperPart:
             elif i.name == "em":
                 data.append({"type": "em", "text": rbk(i.text)})
             elif i.name == "math-inline":
-                data.append({"type": "math-inline", "text": i.text})
+                data.append({"type": "math-inline",
+                             "text": i.text,
+                             "need-trans": True})
             elif i.name == "ref":
                 data.append({"type": "ref", "text": rbk(i.text)})
             else:  # 需要分段
@@ -291,6 +301,7 @@ class PaperPart:
     def _process_math(self, title, math):
         return ("math", {"alias": title,
                          "title": "",
+                         "need-trans": True,
                          "text": math.text})
 
     def _split_title(self, title: str):
@@ -320,6 +331,9 @@ class PaperPart:
     def check(self): pass
 
     def _math_pandoc_word(self):
+        if check_pandoc() == False:
+            return
+
         tmp_fp = tempfile.NamedTemporaryFile(delete=False)
         tmp_fp.close()
         # get math
@@ -361,9 +375,11 @@ class PaperPart:
                 for run in cont:
                     if run["type"] == "math-inline" and run["text"].strip() != "":
                         run["text"] = word_maths_m[count]
+                        run["need-trans"] = False
                         count += 1
             elif name == "math" and cont["text"].strip() != "":
                 cont["text"] = word_maths_m[count]
+                cont["need-trans"] = False
                 count += 1
 
     def compile(self):
@@ -507,7 +523,9 @@ class PaperPart:
                         para.add_run(word.Run(run["text"],
                                               word.Run.Italics | word.Run.Bold))
                     elif run["type"] == "math-inline":
-                        para.add_run(word.Run(run["text"], word.Run.Formula))
+                        para.add_run(word.Run(run["text"],
+                                              word.Run.Formula,
+                                              transform_required=run["need-trans"]))
                     elif run["type"] == "ref":
                         para.add_run(
                             word.Run(run["text"], word.Run.Superscript))
@@ -522,7 +540,9 @@ class PaperPart:
                 table = word.Table(cont['title'], cont['data'])
                 self.block.add_text([table])
             elif name == "math":
-                formula = word.Formula(cont['title'], cont['text'])
+                formula = word.Formula(cont['title'],
+                                       cont['text'],
+                                       cont["need-trans"])
                 self.block.add_text([formula])
             else:
                 print("还没实现now", name)
@@ -564,6 +584,9 @@ class Paper:
             part.load_contents(self.soup)
 
     def compile(self):
+        if check_pandoc() == False:
+            print("Pandoc not found, install pandoc get better math support.")
+
         for part in self.parts:
             part.compile()
 
