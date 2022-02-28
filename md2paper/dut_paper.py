@@ -3,6 +3,7 @@ from md2paper.md2paper import *
 
 from typing import Dict
 import datetime
+from docx.enum.text import WD_LINE_SPACING
 
 class Metadata(Component):
     school: str = None
@@ -320,6 +321,20 @@ class Acknowledgments(Component): #致谢
         ANCHOR = "致    谢"
         incr_next = 0
 
-        #hack: 致谢已经到论文末尾，因此用无法匹配上的字符串直接让他删到最后一行
-        incr_kw = "/\,.;'" 
-        return super().render_template(ANCHOR,incr_next,incr_kw)
+        # hack: 致谢已经到论文末尾，因此用无法匹配上的字符串直接让他删到最后一行
+        incr_kw = "/\,.;'"
+        return super().render_template(ANCHOR, incr_next, incr_kw)
+
+class References(Component):  # 参考文献
+    def render_template(self) -> int:
+        ANCHOR = "参 考 文 献"
+        incr_next = 1
+        incr_kw = "附录A"
+        offset_start = DM.get_anchor_position(ANCHOR)
+        offset_end = super().render_template(ANCHOR, incr_next, incr_kw) - incr_next+1
+        _style = DM.get_doc().styles['参考文献正文']
+        for i in range(offset_start, offset_end):
+            _p = DM.get_doc().paragraphs[i]
+            _p.style = _style
+            _p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+        return offset_end

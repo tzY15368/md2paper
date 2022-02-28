@@ -201,6 +201,7 @@ class RefPart(PaperPart):
 
     def _ref_get_entrytype(self, data: Dict[str, str]) -> str:
         type_map = {"book": "M",
+                    "inbook": "M",
                     "inproceedings": "C",
                     "": "G",
                     "": "N",
@@ -224,7 +225,10 @@ class RefPart(PaperPart):
         return back
 
     def _ref_GB_T_7714_2005(self, data: Dict[str, str]) -> str:
-        assert_error("langid" in data, "参考文献应该有语言信息: "+str(data))
+        if not 'langid' in data:
+            logging.warning(f"参考文献应该有语言信息: {str(data['title'])}，此处默认英文")
+            data["langid"] = 'english'
+        
         langid = data["langid"]
         author = self._ref_get_author(data)
         title = data["title"].replace("{", "").replace("}", "")
