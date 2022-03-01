@@ -200,19 +200,19 @@ class RefPart(PaperPart):
         return author
 
     def _ref_get_entrytype(self, data: Dict[str, str]) -> str:
-        type_map = {"book": "M",
+        type_map = {"book": "M",  # 普通图书
                     "inbook": "M",
-                    "inproceedings": "C",
-                    "": "G",
-                    "": "N",
-                    "article": "J",
-                    "phdthesis": "D",
-                    "techreport": "R",
-                    "misc": "S",
-                    "patent": "P",
-                    "": "DB",
-                    "": "CP",
-                    "": "EB",
+                    "inproceedings": "C",  # 会议录
+                    "collection": "G",  # 汇编
+                    "newspaper": "N",  # 报纸
+                    "article": "J",  # 期刊
+                    "phdthesis": "D",  # 学位论文
+                    "techreport": "R",  # 报告
+                    "legislation": "S",  # 标准
+                    "patent": "P",  # 专利
+                    "": "DB",  # 数据库
+                    "software": "CP",  # 计算机程序
+                    "": "EB",  # 电子公告
                     }
         return type_map[data["ENTRYTYPE"]]
 
@@ -228,7 +228,7 @@ class RefPart(PaperPart):
         if not 'langid' in data:
             logging.warning(f"参考文献应该有语言信息: {str(data['title'])}，此处默认英文")
             data["langid"] = 'english'
-        
+
         langid = data["langid"]
         author = self._ref_get_author(data)
         title = data["title"].replace("{", "").replace("}", "")
@@ -250,7 +250,8 @@ class RefPart(PaperPart):
         if self.bib_path == "":
             return {}
         with open(self.bib_path) as bibtex_file:
-            parser = BibTexParser(common_strings=True)
+            parser = BibTexParser(common_strings=True,
+                                  ignore_nonstandard_types=False)
             bib_database = bibtexparser.load(bibtex_file, parser=parser)
         ref_map = {}
         for item in bib_database.entries:
