@@ -172,11 +172,16 @@ class RefPart(PaperPart):
             authors = []
             for full_name in names:
                 full_name = full_name.split(',')
-                last_name = full_name[0].strip()
-                name = full_name[1].strip().split(" ")
-                name = [x[0] for x in name]
-                name = reduce(lambda x, y: x+" "+y, name)
-                sort_name = "{} {}".format(last_name, name)
+                if len(full_name) < 2:
+                    logging.warning(
+                        "ref_get_author: author name is not normalized, printing as-is")
+                    sort_name = full_name[0]
+                else:
+                    last_name = full_name[0].strip()
+                    first_name = full_name[1].strip().split(" ")
+                    first_name = [x[0] for x in first_name]
+                    first_name = reduce(lambda x, y: x+" "+y, first_name)
+                    sort_name = "{} {}".format(last_name, first_name)
                 authors.append(sort_name)
             if len(authors) > 3:
                 authors = authors[:3]
@@ -211,7 +216,8 @@ class RefPart(PaperPart):
                     "legislation": "S",  # 标准
                     "patent": "P",  # 专利
                     "": "DB",  # 数据库
-                    "software": "CP",  # 计算机程序
+                    "software": "CP",  # 计算机程序,
+                    "misc": "EB/OL",
                     "": "EB",  # 电子公告
                     }
         return type_map[data["ENTRYTYPE"]]

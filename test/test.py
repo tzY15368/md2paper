@@ -1,9 +1,9 @@
+from md2paper import *
+import logging
 import os
 import sys
 sys.path.append('..')
-import logging
 logging.getLogger().setLevel(logging.INFO)
-from md2paper import *
 
 if __name__ == "__main__":
     # GraduationPaper
@@ -13,7 +13,8 @@ if __name__ == "__main__":
     paper.load_contents()
     paper.compile()
 
-    paper.render("word-template/毕业设计（论文）模板-docx.docx", "example/论文.docx")
+    paper.render("word-template/毕业设计（论文）模板-docx.docx",
+                 "example/论文.docx", update_toc=False)
 
     # TranslationPaper
     paper = TranslationPaper()
@@ -21,4 +22,5 @@ if __name__ == "__main__":
     paper.load_contents()
     paper.compile()
 
-    paper.render("word-template/外文翻译模板-docx.docx", "example/外文翻译.docx")
+    paper.render("word-template/外文翻译模板-docx.docx",
+                 "example/外文翻译.docx", update_toc=False)
