@@ -1,8 +1,10 @@
-from md2paper import *
+
 import logging
 import os
 import sys
 sys.path.append('..')
+
+from md2paper import *
 logging.getLogger().setLevel(logging.INFO)
 
 if __name__ == "__main__":
