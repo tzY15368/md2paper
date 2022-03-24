@@ -517,13 +517,13 @@ class Paper:
         for part in self.parts:
             part.compile()
 
-    def render(self, doc: Union[str, BytesIO], out: Union[str, StringIO]):
+    def render(self, doc: Union[str, BytesIO], out: Union[str, StringIO], update_toc=True):
         word.DM.set_doc(doc)
 
         for part in self.parts:
             part.render()
-
-        word.DM.update_toc()
+        if update_toc:
+            word.DM.update_toc()
         word.DM.save(out)
 
 

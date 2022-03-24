@@ -447,19 +447,8 @@ class Table(BaseContent):
                 # looks like order of attributes is important
                 for key in ["sz", "val", "color", "space", "shadow"]:
                     if key in edge_data:
-                        element.set(qn('w:{}'.format(key)), str(edge_data[key]))
-
-class References(Component): #参考文献
-    def render_template(self) -> int:
-        ANCHOR = "参 考 文 献"
-        incr_next = 1
-        incr_kw = "附录A"
-        offset_start = DM.get_anchor_position(ANCHOR)
-        offset_end = super().render_template(ANCHOR, incr_next, incr_kw) -incr_next+1
-        _style = DM.get_doc().styles['参考文献正文']
-        for i in range(offset_start,offset_end):
-            DM.get_doc().paragraphs[i].style = _style
-        return offset_end  
+                        element.set(qn('w:{}'.format(key)),
+                                    str(edge_data[key]))
 
 """
 每一章是一个chapter，
