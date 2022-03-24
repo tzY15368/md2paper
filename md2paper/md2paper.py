@@ -70,6 +70,8 @@ class DocManager():
 
     @classmethod
     def delete_paragraph_by_index(cls, index):
+        logging.debug(
+            f"deleting idx={index} text={cls.get_paragraph(index).text}")
         p = cls.get_doc().paragraphs[index]._element
         p.getparent().remove(p)
         p._p = p._element = None
@@ -161,6 +163,10 @@ class Component():
         i = 0
         while not incr_kw in DM.get_doc().paragraphs[offset+incr_next].text\
                 and (offset+incr_next) != (len(DM.get_doc().paragraphs)-1):
+            logging.debug("deleted content: {}...".format(
+                DM.get_paragraph(offset).text[:min(
+                    10, len(DM.get_paragraph(offset).text))]
+            ))
             DM.delete_paragraph_by_index(offset)
             i = i+1
         logging.debug(
@@ -339,6 +345,8 @@ class Formula(BaseContent):
         self.__transform_required = transform_required
 
     def render_paragraph(self, offset: int) -> int:
+        logging.debug("rendering formula `{}`: {}".format(
+            self.__title, self.__formula))
         new_offset = offset
         p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -347,7 +355,7 @@ class Formula(BaseContent):
         DM.delete_paragraph_by_index(new_offset)
 
         # 公式cell
-        if self.__title:
+        if self.__formula:
             cell_formula = table.rows[0].cells[1]
             cell_formula.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             empty = {'color': Table.white}
@@ -484,6 +492,7 @@ class Table(BaseContent):
                         element.set(qn('w:{}'.format(key)),
                                     str(edge_data[key]))
 
+
 """
 每一章是一个chapter，
 每个chapter内标题后可以直接跟block或section，
@@ -574,12 +583,16 @@ class Block():  # content
         if not self.__content_list:
             return offset
         new_offset = offset
+        offset_map = {}  # 结尾的offset
         for i, content in enumerate(self.__content_list):
             new_offset = content.render_paragraph(new_offset)
-            _media_types = [Image, Formula, Table]
-            if i < len(self.__content_list)-1 and type(content) in _media_types and type(self.__content_list[i+1]) in _media_types:
+            offset_map[i] = new_offset
+            _media_types = [Image, Table]
+            if i < len(self.__content_list)-1 and\
+                    type(content) in _media_types and\
+                    type(self.__content_list[i+1]) in _media_types:
                 # 多媒体内容之间也只空一行
-                DM.delete_paragraph_by_index(new_offset)
+                DM.delete_paragraph_by_index(offset_map[i-1])
                 new_offset = new_offset - 1
 
         return new_offset

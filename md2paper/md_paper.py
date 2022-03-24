@@ -300,7 +300,7 @@ class PaperPart:
 
     def _process_math(self, title, math):
         return ("math", {"alias": title,
-                         "title": "",
+                         "title": title,
                          "need-trans": True,
                          "text": math.text})
 

@@ -1,7 +1,10 @@
+import os
+if os.path.split(os.getcwd())[1] != 'test':
+    os.chdir('test')
 import sys
 sys.path.append('..')
 import logging
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 from md2paper.dut_paper_translation import *
 
 if __name__ == "__main__":
@@ -21,13 +24,12 @@ if __name__ == "__main__":
     abs.add_keywords(["塔塔开","都得死"])
     
     images = Image([
-        ImageData("","图1：these are the classes"),
-        ImageData("","图2:asldkfja;sldkf")
+        ImageData("classes.png","图1：these are the classes")
     ])
-    formula = Formula("公式3.4",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN")
+    formula = Formula("公式3.444",r"\sum_{i=1}^{10}{\frac{\sigma_{zp,i}}{E_i} kN")
     more_text = Text().add_run(Run("only italics",Run.Italics))
     abs.add_text("如果代码中出现太多的条件判断语句的话，代码就会变得难以维护和阅读。 这里的解决方案是将每个状态抽取出来定义成一个类。这里看上去有点奇怪，每个状态对象都只有静态方法")
-    abs.add_text([images,formula,more_text])
+    abs.add_text([images,images,formula,more_text])
 
     abs.render_template()
 
