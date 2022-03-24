@@ -8,7 +8,9 @@ import os
 import bibtexparser
 from bibtexparser.bparser import BibTexParser
 from typing import Dict, List, Union
-
+import pypandoc
+import docx
+import tempfile
 from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
 
@@ -88,8 +90,16 @@ def ref_items_list_unfold(ref_items_list: list):
 def re_space(s: str):
     return re.compile("^ *{} *".format(s))
 
-# 数据类型
 
+def check_pandoc() -> bool:
+    try:
+        pypandoc._ensure_pandoc_path(quiet=True)
+    except OSError:
+        return False
+    return True
+
+
+# 数据类型
 
 class RefItem:
     IMG = "img"
@@ -182,8 +192,8 @@ class PaperPart:
         data = []
         for i in p.children:
             if i.name == None:
-                if not hasattr(i,"text"):
-                    setattr(i,"text",str(i))
+                if not hasattr(i, "text"):
+                    setattr(i, "text", str(i))
                 if i.text == "\n":
                     continue
                 data.append({"type": "text", "text": rbk(i.text)})
@@ -196,7 +206,9 @@ class PaperPart:
             elif i.name == "em":
                 data.append({"type": "em", "text": rbk(i.text)})
             elif i.name == "math-inline":
-                data.append({"type": "math-inline", "text": i.text})
+                data.append({"type": "math-inline",
+                             "text": i.text,
+                             "need-trans": True})
             elif i.name == "ref":
                 data.append({"type": "ref", "text": rbk(i.text)})
             else:  # 需要分段
@@ -260,8 +272,8 @@ class PaperPart:
                           "data": data})
 
     def _process_lis(self, li, level):
-        if not hasattr(li.contents[0],"text"):
-            setattr(li.contents[0],"text",str(li.contents[0]))
+        if not hasattr(li.contents[0], "text"):
+            setattr(li.contents[0], "text", str(li.contents[0]))
         if (li.contents[0].text == "\n"):  # <p>
             conts = self._get_content_from(li.contents[0], level+1)
         else:  # text
@@ -289,6 +301,7 @@ class PaperPart:
     def _process_math(self, title, math):
         return ("math", {"alias": title,
                          "title": "",
+                         "need-trans": True,
                          "text": math.text})
 
     def _split_title(self, title: str):
@@ -317,7 +330,60 @@ class PaperPart:
 
     def check(self): pass
 
-    def compile(self): pass
+    def _math_pandoc_word(self):
+        if check_pandoc() == False:
+            return
+
+        tmp_fp = tempfile.NamedTemporaryFile(delete=False)
+        tmp_fp.close()
+        # get math
+        math_list: List[str] = []
+        for name, cont in self.contents:
+            if name == "p":
+                for run in cont:
+                    if run["type"] == "math-inline" and run["text"].strip() != "":
+                        math_list.append(run["text"])
+            elif name == "math" and cont["text"].strip() != "":
+                math_list.append(cont["text"])
+
+        # get word
+        if math_list == []:
+            return
+        md_list = ["${}$".format(i.strip()) for i in math_list]
+        md = reduce(lambda x, y: x+'\n\n'+y, md_list)
+        pypandoc.convert_text(md, "docx", "md", outputfile=tmp_fp.name)
+        doc = docx.Document(tmp_fp.name)
+        paras_xml = [str(i._element.xml) for i in doc.paragraphs]
+        os.unlink(tmp_fp.name)
+        oMath_head = "<m:oMath>"
+        oMath_tail = "</m:oMath>"
+        word_maths = [para_xml[para_xml.find(oMath_head):
+                               para_xml.find(oMath_tail) + len(oMath_tail)]
+                      for para_xml in paras_xml]
+        word_maths_m: List[str] = []
+        for word_math in word_maths:
+            pos = word_math.find('>')
+            word_math = word_math[:pos] + \
+                ' xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"' + \
+                word_math[pos:]
+            word_maths_m.append(word_math)
+
+        # put back
+        count = 0
+        for name, cont in self.contents:
+            if name == "p":
+                for run in cont:
+                    if run["type"] == "math-inline" and run["text"].strip() != "":
+                        run["text"] = word_maths_m[count]
+                        run["need-trans"] = False
+                        count += 1
+            elif name == "math" and cont["text"].strip() != "":
+                cont["text"] = word_maths_m[count]
+                cont["need-trans"] = False
+                count += 1
+
+    def compile(self):
+        self._math_pandoc_word()
 
     def _get_ref_items(self, conts, index_prefix: str = "") -> Dict[str, RefItem]:
         def get_index(index_prefix: str, chapter_cnt: int, item_cnt: int):
@@ -457,7 +523,9 @@ class PaperPart:
                         para.add_run(word.Run(run["text"],
                                               word.Run.Italics | word.Run.Bold))
                     elif run["type"] == "math-inline":
-                        para.add_run(word.Run(run["text"], word.Run.Formula))
+                        para.add_run(word.Run(run["text"],
+                                              word.Run.Formula,
+                                              transform_required=run["need-trans"]))
                     elif run["type"] == "ref":
                         para.add_run(
                             word.Run(run["text"], word.Run.Superscript))
@@ -472,7 +540,9 @@ class PaperPart:
                 table = word.Table(cont['title'], cont['data'])
                 self.block.add_text([table])
             elif name == "math":
-                formula = word.Formula(cont['title'], cont['text'])
+                formula = word.Formula(cont['title'],
+                                       cont['text'],
+                                       cont["need-trans"])
                 self.block.add_text([formula])
             else:
                 print("还没实现now", name)
@@ -514,6 +584,9 @@ class Paper:
             part.load_contents(self.soup)
 
     def compile(self):
+        if check_pandoc() == False:
+            print("Pandoc not found, install pandoc get better math support.")
+
         for part in self.parts:
             part.compile()
 

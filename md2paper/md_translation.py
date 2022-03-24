@@ -123,6 +123,7 @@ class TransMainPart(TranslationPart):
                 is_text = False
 
     def compile(self):
+        super().compile()
         self._link_ref()
 
         self.contents.insert(-2, ("p", []))
