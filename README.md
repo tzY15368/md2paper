@@ -18,18 +18,15 @@ generate thesis paper with certain format in docx from markdown
 考虑到以下问题：
 
 - 原有word模板没有正确使用word提供的编号、格式以及ref机制
-
-- 难以不出差错地写出符合格式要求的内容，
-  
+- 难以不出差错地写出符合格式要求的内容
 - 压缩保存的word文档不易版本控制
-
 - latex难以生成完美符合格式要求的终产物，也不具备与docx格式之间的互可操作性
 
 创建一种包含格式context的中间表示，并使用脚本把实际内容渲染到docx文档中是一种可能的缓解难以避免的格式问题的办法。
 
 ## 技术路线
 
-基于“毕业设计论文模板.docx”中内置的样式，使用python-docx库直接对文档内容进行操作，生成新文档。由于docx格式事实上线性地存放文档中每个段落，md2paper使用该数组下标进行内容的增删查改操作，参考`DocManager`类以及`md2paper.py`代码中相关用法。 
+基于“毕业设计论文模板.docx”中内置的样式，使用python-docx库直接对文档内容进行操作，生成新文档。由于docx格式事实上线性地存放文档中每个段落，md2paper使用该数组下标进行内容的增删查改操作，参考`DocManager`类以及`md2paper.py`代码中相关用法。
 
 ### 可能更合适的方案
 
@@ -47,7 +44,7 @@ generate thesis paper with certain format in docx from markdown
 
 ## 核心模块功能说明
 
-### 前端 `mdext.py`
+### 前端 `md_paper.py`
 
 将来自markdown的数据转为html后使用`bs4`解析，提取为中间表示
 
