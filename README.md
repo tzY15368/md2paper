@@ -9,9 +9,12 @@ generate thesis paper with certain format in docx from markdown
 
 参考 `example/*.md` 编写符合扩展语法的 Markdown 文档，参考执行 `example.sh` 转换为 Word。
 
+md2paper使用的静态资源（`word-template/*`, `md2paper/mml2omml.xsl`）理论上都支持**任意**执行路径，事实上可以在任意path执行 `xx/xx/md2paper/main.py [CMDLINE ARGUMENTS]`，最终产物会保存至`cwd`
+
+项目根目录下`/libs`文件夹，用于支持实验性的wasm静态页面【WIP】
+
 **注意**
-本项目无法保证生成文档严格符合模板全部格式要求，
-请及时检查生成的 Word 格式是否符合预期。
+本项目无法保证生成文档严格符合模板全部格式要求，比如两个字符的缩进事实上是用0.82cm实现的。请*务必*及时检查生成的 Word 格式是否符合预期。
 
 ## 主要解决的问题
 
