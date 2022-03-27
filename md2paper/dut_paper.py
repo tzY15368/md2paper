@@ -348,5 +348,5 @@ class References(Component):  # 参考文献
         for i in range(offset_start, offset_end):
             _p = DM.get_doc().paragraphs[i]
             _p.style = _style
-            _p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+            _p.paragraph_format.first_line_indent = Cm(0)
         return offset_end
