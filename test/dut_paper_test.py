@@ -80,11 +80,12 @@ But if you know for sure none of those are present, these few lines should get t
 
     c3 = mc.add_chapter("第三章 大观园")
     mc.add_text(t,location=c3)
+    
     data = [
         Row(['第一章','第二章','第三章'],top_border=True),
         Row(['刘姥姥初试钢铁侠','刘姥姥初试大不净者','刘姥姥倒拔绿巨人'],top_border=True),
         Row(['刘姥姥初试惊奇队长',None,'刘姥姥菜花染诸神']),
-        Row(['菜花反噬！','天地乖离菜花之星','重启刘姥姥菜花宇宙'],top_border=True)
+        Row(['菜花反噬！',Text().add_run(Run(r"\sum^{n}_{i=0}{i}",style=Run.Formula)),'重启刘姥姥菜花宇宙'],top_border=True)
     ]
     table = Table("表1 刘姥姥背叛斯大林",data)
     mc.add_text([table, Text("wtf is this?")],location=c3)

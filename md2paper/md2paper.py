@@ -2,6 +2,7 @@ from __future__ import annotations
 from io import BytesIO, StringIO
 from typing import Union, List, Tuple
 import docx
+from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_ALIGN_VERTICAL
@@ -229,8 +230,17 @@ class Text(BaseContent):
         self.__runs.append(Run.get_tabstop())
         return self
 
-    def render_paragraph(self, offset: int) -> int:
-        new_offset = offset
+    def render_paragraph(self, position: Union[int, Paragraph]) -> int:
+        if type(position) == Paragraph:
+            for run in self.__runs:
+                if not run.is_tabstop():
+                    run.render_run(position.add_run())
+                else:
+                    raise ValueError("no tabstops in direct paragraph position assignment")
+            return
+        if type(position) != int:
+            raise TypeError("invalid type",type(position))
+        new_offset = position
         p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         for run in self.__runs:
             if not run.is_tabstop():
@@ -328,14 +338,6 @@ class Image(BaseContent):
 
         return new_offset
 
-# Row of Table
-
-
-class Row():
-    def __init__(self, data: List[str], top_border: bool = False) -> None:
-        self.row: List[str] = data
-        self.has_top_border = top_border
-
 
 class Formula(BaseContent):
     def __init__(self, title: str, formula: str, transform_required: bool = True) -> None:
@@ -380,6 +382,14 @@ class Formula(BaseContent):
         cell_idx_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         return new_offset
 
+# Row of Table
+
+
+class Row():
+    def __init__(self, data: List[Union[Text, str]], top_border: bool = False) -> None:
+        self.row: List[Union[Text, str]] = data
+        self.has_top_border = top_border
+
 
 class Table(BaseContent):
     # table的最后一行默认有下边框，剩下依靠row的top-border自行决定
@@ -422,7 +432,7 @@ class Table(BaseContent):
 
         # 填充内容, 编辑表格样式
         for i, row in enumerate(self.__table):
-            for j, cell_str in enumerate(row.row):
+            for j, cell_content in enumerate(row.row):
                 cell = table.rows[i].cells[j]
                 cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 Table.set_cell_border(
@@ -434,7 +444,7 @@ class Table(BaseContent):
                     start={"color": self.white},
                     end={"color": self.white}
                 )
-                if cell_str == None:
+                if cell_content == None:
                     if i == 0:
                         raise ValueError("invalid empty field in row 0")
                     else:
@@ -444,7 +454,13 @@ class Table(BaseContent):
                         other_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 else:
                     p = cell.paragraphs[0]
-                    p.text = cell_str
+                    if type(cell_content) == str:
+                        p.text = cell_content
+                    elif type(cell_content) == Text:
+                        cell_content.render_paragraph(p)
+                    else:
+                        raise TypeError(
+                            "invalid type {}".format(type(cell_content)))
                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     p.style = DM.get_doc().styles['图名中文']
 
