@@ -236,10 +236,11 @@ class Text(BaseContent):
                 if not run.is_tabstop():
                     run.render_run(position.add_run())
                 else:
-                    raise ValueError("no tabstops in direct paragraph position assignment")
+                    raise ValueError(
+                        "no tabstops in direct paragraph position assignment")
             return
         if type(position) != int:
-            raise TypeError("invalid type",type(position))
+            raise TypeError("invalid type", type(position))
         new_offset = position
         p = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         for run in self.__runs:
@@ -399,7 +400,7 @@ class Table(BaseContent):
     def __init__(self, title: str, table: List[Row]) -> None:
         super().__init__()
         self.__auto_fit = True
-        self.__columns_width:List[float] = []
+        self.__columns_width: List[float] = []
         self.__title = title
         self.__table: List[Row] = table
         if len(table) < 1:
@@ -407,9 +408,10 @@ class Table(BaseContent):
         self.__cols = len(self.__table[0].row)
         self.__rows = len(self.__table)
 
-    def set_columns_width(self,widths:List[float]):
+    def set_columns_width(self, widths: List[float]):
         if len(widths) != self.__cols:
-            raise ValueError("invalid column width params, got {}, want {}",len(widths),self.__cols)
+            raise ValueError(
+                "invalid column width params, got {}, want {}", len(widths), self.__cols)
         self.__auto_fit = False
         self.__columns_width = widths
 
@@ -429,7 +431,7 @@ class Table(BaseContent):
         table = DM.get_doc().add_table(rows=self.__rows, cols=self.__cols, style='Table Grid')
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         if not self.__auto_fit:
-            table.autofit = False 
+            table.autofit = False
             table.allow_autofit = False
 
         # 将table挪到paragrpah里
