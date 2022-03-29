@@ -88,6 +88,7 @@ But if you know for sure none of those are present, these few lines should get t
         Row(['菜花反噬！',Text().add_run(Run(r"\sum^{n}_{i=0}{i}",style=Run.Formula)),'重启刘姥姥菜花宇宙'],top_border=True)
     ]
     table = Table("表1 刘姥姥背叛斯大林",data)
+    table.set_columns_width([0.1,0.1,0.5])
     mc.add_text([table, Text("wtf is this?")],location=c3)
     mc.render_template()
 

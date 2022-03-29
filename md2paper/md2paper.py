@@ -5,7 +5,7 @@ import docx
 from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
 from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 import lxml
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -398,12 +398,20 @@ class Table(BaseContent):
 
     def __init__(self, title: str, table: List[Row]) -> None:
         super().__init__()
+        self.__auto_fit = True
+        self.__columns_width:List[float] = []
         self.__title = title
         self.__table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
         self.__cols = len(self.__table[0].row)
         self.__rows = len(self.__table)
+
+    def set_columns_width(self,widths:List[float]):
+        if len(widths) != self.__cols:
+            raise ValueError("invalid column width params, got {}, want {}",len(widths),self.__cols)
+        self.__auto_fit = False
+        self.__columns_width = widths
 
     def render_paragraph(self, offset: int) -> int:
         new_offset = offset
@@ -419,12 +427,20 @@ class Table(BaseContent):
 
         p2 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
         table = DM.get_doc().add_table(rows=self.__rows, cols=self.__cols, style='Table Grid')
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        if not self.__auto_fit:
+            table.autofit = False 
+            table.allow_autofit = False
+
         # 将table挪到paragrpah里
         p2._p.addnext(table._tbl)
         # 挪完删掉paragraph
         DM.delete_paragraph_by_index(new_offset)
 
         #new_offset = new_offset + 1
+        if self.__auto_fit:
+            for i in range(len(table.columns)):
+                table.columns[i].width = Inches(self.__columns_width[i] * 6)
 
         # 结尾再换
         p1 = DM.get_doc().paragraphs[new_offset].insert_paragraph_before()
@@ -435,6 +451,8 @@ class Table(BaseContent):
             for j, cell_content in enumerate(row.row):
                 cell = table.rows[i].cells[j]
                 cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                if not self.__auto_fit:
+                    cell.width = Inches(self.__columns_width[j] * 6)
                 Table.set_cell_border(
                     cell,
                     top={
