@@ -396,10 +396,10 @@ class PaperPart:
             return get_index(index_prefix, chapter_cnt, img_cnt)
 
         def table_index() -> str:
-            return get_index(index_prefix, chapter_cnt, img_cnt)
+            return get_index(index_prefix, chapter_cnt, table_cnt)
 
         def math_index() -> str:
-            return get_index(index_prefix, chapter_cnt, img_cnt)
+            return get_index(index_prefix, chapter_cnt, formula_cnt)
 
         ref_items = {}
         chapter_cnt = 0
