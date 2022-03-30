@@ -440,7 +440,7 @@ class Table(BaseContent):
         DM.delete_paragraph_by_index(new_offset)
 
         #new_offset = new_offset + 1
-        if self.__auto_fit:
+        if not self.__auto_fit:
             for i in range(len(table.columns)):
                 table.columns[i].width = Inches(self.__columns_width[i] * 6)
 
