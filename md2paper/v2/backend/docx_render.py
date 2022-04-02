@@ -4,7 +4,7 @@ from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
 from typing import List, Union, Tuple
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-from md2paper.v2.util import *
+from .util import *
 from docx.enum.text import WD_TAB_ALIGNMENT, WD_PARAGRAPH_ALIGNMENT, WD_BREAK
 from PIL import Image as PILImage
 from docx.oxml import OxmlElement
