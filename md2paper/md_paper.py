@@ -155,7 +155,6 @@ class TableRow:
             if p == None:
                 return False
             cnt = 0
-            print(p)
             for i in raw_text(p[1]):
                 if i != '-':
                     return False
@@ -166,7 +165,6 @@ class TableRow:
         return True
 
     def as_word_row(self):
-        print(self.ps)
         return word.Row([PLike(p[0], p[1]).as_word_text() if p != None else None for p in self.ps], self.top_border)
 
 
