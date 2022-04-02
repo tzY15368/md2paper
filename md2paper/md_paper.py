@@ -13,6 +13,7 @@ import docx
 import tempfile
 from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
+from md2paper.v2.base import *
 
 debug = False
 
@@ -614,6 +615,38 @@ class PaperPart:
                                        cont['text'],
                                        cont["need-trans"])
                 self.block.add_text([formula])
+            else:
+                print("还没实现now", name)
+
+    def _v2_block_load_body(self, conts=None):
+        if conts == None:
+            conts = self.contents
+        block = self.block
+        block_stack = [block]
+        for (name, cont) in conts:
+            if name in ["h1", "h2", "h3"]:
+                level = int(name[1])
+                while len(block_stack) > level:
+                    block_stack.pop()
+                block = Block()
+                block_stack.append(block)
+                block.set_title(cont, level)
+            elif name in ["p", "fh4", "fh5"]:
+                para = self._make_para(name, cont)
+                block.add_content(para)
+            elif name == "img":
+                img = Image(
+                    [ImageData(cont["src"], cont["title"], cont["ratio"])])
+                block.add_content(img)
+            elif name == "table":
+                data = [tableRow.as_word_row() for tableRow in cont['data']]
+                table = Table(cont['title'], data)
+                block.add_content(table)
+            elif name == "math":
+                formula = Formula(cont['title'],
+                                  cont['text'],
+                                  cont["need-trans"])
+                block.add_content(formula)
             else:
                 print("还没实现now", name)
 

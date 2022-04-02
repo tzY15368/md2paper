@@ -4,13 +4,14 @@ from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
 from typing import List, Union, Tuple
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-from util import *
+from md2paper.v2.util import *
 from docx.enum.text import WD_TAB_ALIGNMENT, WD_PARAGRAPH_ALIGNMENT, WD_BREAK
 from PIL import Image as PILImage
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
+
 
 class Run():
     Normal = 1
@@ -63,7 +64,7 @@ class Text(BaseContent):
 
     two_chars_length = Cm(0.82)
 
-    def __init__(self, raw_text: str = "", style: int = Run.Normal, force_style:str='',first_line_indent=Cm(0.82)) -> None:
+    def __init__(self, raw_text: str = "", style: int = Run.Normal, force_style: str = '', first_line_indent=Cm(0.82)) -> None:
         self.runs: List[Run] = []
         self.force_style = force_style
         self.first_line_indent = first_line_indent
@@ -174,7 +175,6 @@ class Formula(BaseContent):
         self.__title: str = title
         self.__formula: str = formula
         self.__transform_required = transform_required
-
 
     @classmethod
     def latex_to_word(cls, latex_input, transform_required=True):
@@ -377,12 +377,12 @@ class Block():  # content
                 raise TypeError("expected BaseContent, got", type(content))
         self.__content_list += args
 
-    def render_template(self, paragraph:Paragraph=None):
+    def render_template(self, paragraph: Paragraph = None):
         if not paragraph:
             # 最后开始append
             paragraph = DM.get_doc().add_paragraph()
-        
-        # 
+
+        #
         if self.__title:
             logging.debug(f"block(level={self.__level}) title: {self.__title}")
             p_title = paragraph.insert_paragraph_before()
@@ -397,17 +397,15 @@ class Block():  # content
             title_run = p_title.add_run()
             title_run.text = self.__title
 
-            
         for i, content in enumerate(self.__content_list):
             par = paragraph.insert_paragraph_before()
             content.render_paragraph(par)
             if i != len(self.__content_list)-1:
 
-
-                if not isinstance(self.__content_list[i+1],Text):
+                if not isinstance(self.__content_list[i+1], Text):
                     paragraph.insert_paragraph_before().text = "Bbb"
                 else:
-                    if not isinstance(content,Text):
+                    if not isinstance(content, Text):
                         paragraph.insert_paragraph_before().text = "aaa"
 
         for block in self.__sub_blocks:
