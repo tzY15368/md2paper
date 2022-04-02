@@ -101,6 +101,38 @@ def check_pandoc() -> bool:
 
 # 数据类型
 
+class PLike:
+    def __init__(self, name, runs):
+        self.name = name
+        self.runs = runs
+
+    def as_word_text(self):
+        if not debug:
+            para = word.Text()
+        else:
+            para = word.Text(self.name)
+        for run in self.runs:
+            if run["type"] == "text":
+                para.add_run(word.Run(run["text"], word.Run.Normal))
+            elif run["type"] == "strong":
+                para.add_run(word.Run(run["text"], word.Run.Bold))
+            elif run["type"] == "em":
+                para.add_run(word.Run(run["text"], word.Run.Italics))
+            elif run["type"] == "strong-em":
+                para.add_run(word.Run(run["text"],
+                                      word.Run.Italics | word.Run.Bold))
+            elif run["type"] == "math-inline":
+                para.add_run(word.Run(run["text"],
+                                      word.Run.Formula,
+                                      transform_required=run["need-trans"]))
+            elif run["type"] == "ref":
+                para.add_run(
+                    word.Run(run["text"], word.Run.Superscript))
+            else:
+                print("还没实现now", self.name)
+        return para
+
+
 class RefItem:
     IMG = "img"
     TABLE = "Table"
@@ -111,6 +143,29 @@ class RefItem:
         self.index = str(index)
         self.text = text
         self.type = type
+
+
+class TableRow:
+    def __init__(self, ps, top_border=False):
+        self.ps = ps
+        self.top_border = top_border
+
+    def is_border(self):
+        for p in self.ps:
+            if p == None:
+                return False
+            cnt = 0
+            for i in raw_text(p[1]):
+                if i != '-':
+                    return False
+                else:
+                    cnt += 1
+            if cnt < 3:
+                return False
+        return True
+
+    def as_word_row(self):
+        return word.Row([PLike(p[0], p[1]).as_word_text() if p != None else None for p in self.ps], self.top_border)
 
 
 # 每个论文模块
@@ -241,30 +296,40 @@ class PaperPart:
     def _process_table(self, title, table):
         data = []
         # 表头，有上实线
-        data.append(word.Row([rbk(i.text) for i in table.find("thead").find_all("th")],
-                             top_border=True))
+        row = []
+        for th in table.find("thead").find_all("th"):
+            ps = self._process_ps(th)
+            if len(ps) == 0:
+                row.append(None)
+            elif len(ps) == 1:
+                row.append(ps[0])
+            else:
+                log_error("表格中不能换行")
+        data = [TableRow(row, True)]
+
         has_border = True  # 表身第一行有上实线
         for tr in table.find("tbody").find_all("tr"):
-            row = [rbk(i.text) for i in tr.find_all("td")]  # get all text
-            row = list(map(lambda x: None if x == '' else x,
-                           row))  # replace '' with None
+            row = []
+            for td in tr.find_all("td"):
+                ps = self._process_ps(td)
+                if len(ps) == 0:
+                    row.append(None)
+                elif len(ps) == 1:
+                    row.append(ps[0])
+                else:
+                    print(ps)
+                    log_error("表格中不能换行")
+
             if has_border:
-                data.append(word.Row(row, top_border=True))
+                tableRow = TableRow(row, top_border=True)
                 has_border = False
             else:
-                is_border = True
-                for i in row:
-                    if i == None:
-                        is_border = False
-                        break
-                    for j in i:
-                        if j != '-':
-                            is_border = False
-                            break
-                if is_border:
-                    has_border = True  # 自定义的实线，下一行数据有上实线
-                else:
-                    data.append(word.Row(row))
+                tableRow = TableRow(row)
+
+            if tableRow.is_border():
+                has_border = True  # 自定义的实线，下一行数据有上实线
+            else:
+                data.append(tableRow)
 
         ali, title, _ = self._split_title(title)
         return ("table", {"alias": ali,
@@ -396,10 +461,10 @@ class PaperPart:
             return get_index(index_prefix, chapter_cnt, img_cnt)
 
         def table_index() -> str:
-            return get_index(index_prefix, chapter_cnt, img_cnt)
+            return get_index(index_prefix, chapter_cnt, table_cnt)
 
         def math_index() -> str:
-            return get_index(index_prefix, chapter_cnt, img_cnt)
+            return get_index(index_prefix, chapter_cnt, formula_cnt)
 
         ref_items = {}
         chapter_cnt = 0
@@ -497,6 +562,32 @@ class PaperPart:
 
     # 渲染
 
+    def _make_para(self, name: str, cont):
+        if not debug:
+            para = word.Text()
+        else:
+            para = word.Text(name)
+        for run in cont:
+            if run["type"] == "text":
+                para.add_run(word.Run(run["text"], word.Run.Normal))
+            elif run["type"] == "strong":
+                para.add_run(word.Run(run["text"], word.Run.Bold))
+            elif run["type"] == "em":
+                para.add_run(word.Run(run["text"], word.Run.Italics))
+            elif run["type"] == "strong-em":
+                para.add_run(word.Run(run["text"],
+                                      word.Run.Italics | word.Run.Bold))
+            elif run["type"] == "math-inline":
+                para.add_run(word.Run(run["text"],
+                                      word.Run.Formula,
+                                      transform_required=run["need-trans"]))
+            elif run["type"] == "ref":
+                para.add_run(
+                    word.Run(run["text"], word.Run.Superscript))
+            else:
+                print("还没实现now", name)
+        return para
+
     def _block_load_body(self, conts=None):
         if conts == None:
             conts = self.contents
@@ -508,36 +599,15 @@ class PaperPart:
             elif name == "h3":
                 self.block.add_subsection(cont)
             elif name in ["p", "fh4", "fh5"]:
-                if not debug:
-                    para = word.Text()
-                else:
-                    para = word.Text(name)
-                for run in cont:
-                    if run["type"] == "text":
-                        para.add_run(word.Run(run["text"], word.Run.Normal))
-                    elif run["type"] == "strong":
-                        para.add_run(word.Run(run["text"], word.Run.Bold))
-                    elif run["type"] == "em":
-                        para.add_run(word.Run(run["text"], word.Run.Italics))
-                    elif run["type"] == "strong-em":
-                        para.add_run(word.Run(run["text"],
-                                              word.Run.Italics | word.Run.Bold))
-                    elif run["type"] == "math-inline":
-                        para.add_run(word.Run(run["text"],
-                                              word.Run.Formula,
-                                              transform_required=run["need-trans"]))
-                    elif run["type"] == "ref":
-                        para.add_run(
-                            word.Run(run["text"], word.Run.Superscript))
-                    else:
-                        print("还没实现now", name)
+                para = self._make_para(name, cont)
                 self.block.add_text([para])
             elif name == "img":
                 img = word.Image(
                     [word.ImageData(cont["src"], cont["title"], cont["ratio"])])
                 self.block.add_text([img])
             elif name == "table":
-                table = word.Table(cont['title'], cont['data'])
+                data = [tableRow.as_word_row() for tableRow in cont['data']]
+                table = word.Table(cont['title'], data)
                 self.block.add_text([table])
             elif name == "math":
                 formula = word.Formula(cont['title'],
