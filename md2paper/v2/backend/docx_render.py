@@ -228,8 +228,6 @@ class Formula(BaseContent):
         p.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
         p.style = DM.get_style(self.formula_alt_style)
 
-# row of table
-
 
 class ListItem:
     def __init__(self, content_list: List[BaseContent]) -> None:
@@ -259,6 +257,8 @@ class OrderedList(BaseContent):
         for item in self.item_list:
             item.render_paragraph(paragraph)
 
+
+# row of table
 
 class Row():
     def __init__(self, data: List[Text, str], top_border: bool = False) -> None:
@@ -375,6 +375,13 @@ class Table(BaseContent):
                     if key in edge_data:
                         element.set(qn('w:{}'.format(key)),
                                     str(edge_data[key]))
+
+
+class Code(BaseContent):
+    def __init__(self, language: str, txt: str) -> None:
+        super().__init__()
+        self.language = language
+        self.txt = txt
 
 
 class Block():  # content

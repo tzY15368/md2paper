@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import reduce
 import logging
 from typing import List, Type
 import markdown
@@ -52,25 +53,30 @@ class Paper():
                 block_stack.append(last_block)
                 # get content
                 last_block.set_title(cur.text, level)
-            elif name == 'p':
+            else:
                 content_list = self.__get_contents(cur)
                 last_block.add_content(*content_list)
-            elif name == 'table':
-                table = self.__get_table(cur)
-                last_block.add_content(table)
-            elif name == 'math':
-                math = self.__get_math(cur)
-                last_block.add_content(math)
-            elif name == 'ol':
-                ol = self.__get_ordered_list(cur)
-                last_block.add_content(ol)
-            else:
-                logging.error("这是啥？" + str(cur))
 
         # 检查md内容是否满足preprocessor给出的要求
         # self.__preprocess()
 
     def __get_contents(self, cur):
+        name = cur.name
+        if name == None:
+            return []
+        elif name == 'p':
+            return self.__get_super_texts(cur)
+        elif name == 'table':
+            return [self.__get_table(cur)]
+        elif name == 'math':
+            return [self.__get_math(cur)]
+        elif name == 'ol':
+            return [self.__get_ordered_list(cur)]
+        else:
+            logging.error("这是啥？" + str(cur))
+            return []
+
+    def __get_super_texts(self, cur):
         content_list = []
         text = Text()
         for i in cur.children:
@@ -102,8 +108,10 @@ class Paper():
                     pass
                 elif name == "img":  # 图片
                     content_list.append(self.__get_image(i))
-                elif i.name == "ol":
+                elif name == "ol":
                     content_list.append(self.__get_ordered_list(i))
+                elif name == 'code':
+                    content_list.append(self.__get_code(cur))
                 else:
                     logging.error("缺了什么？" + str(i))
         if not text.empty():
@@ -112,7 +120,7 @@ class Paper():
 
     def __get_table(self, table):
         def get_table_row_item(t_):
-            content_list = self.__get_contents(t_)
+            content_list = self.__get_super_texts(t_)
             if len(content_list) == 0:
                 return None
             elif len(content_list) == 1:
@@ -141,10 +149,23 @@ class Paper():
 
     def __get_ordered_list(self, ol):
         def get_list_item(li):
-            return self.__get_contents(li)
+            if (li.contents[0].text == "\n"):  # <p>
+                content_list_list = [self.__get_contents(cur)
+                                     for cur in li.contents]
+                content_list = reduce(
+                    lambda x, y: x+y, content_list_list)  # flatten
+            else:  # text
+                content_list = self.__get_super_texts(li)
+            return content_list
+
         ordered_list = [get_list_item(li)
                         for li in ol.find_all("li", recursive=False)]
         return OrderedList(ordered_list)
+
+    def __get_code(self, code):
+        codes: str = code.text
+        first_line = codes.splitlines()[0]
+        return Code(language=first_line.strip(), txt=codes[len(first_line):])
 
     """
     __Check checks if the sequence of h1 titles of blocks match that of 
