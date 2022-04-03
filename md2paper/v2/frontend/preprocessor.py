@@ -1,10 +1,29 @@
 import copy
 import logging
-from typing import List
+from typing import List, Callable
 from docx.text.paragraph import Paragraph
 import re
 
 from md2paper.v2 import backend
+
+
+class PaperPartPreprocessor():
+    def __init__(self, block: backend.Block) -> None:
+        self.block = block
+        # 这里目前是写死的，后续可以放开
+        self.callbacks: List[Callable] = [
+            backend.Block.register_labels,
+            backend.Block.register_reference
+        ]
+
+        # 写死的map
+        self.method_map = {
+            backend.Block.register_labels: BasePreprocessor.register_label,
+            backend.Block.register_reference: BasePreprocessor.register_ref
+        }
+
+    def call_methods(index:int):
+        pass
 
 
 class BasePreprocessor():
@@ -60,6 +79,14 @@ class BasePreprocessor():
                     return
             parts = parts[offset:]
             i = i + 1
+
+    @classmethod
+    def register_label(cls, alt_name: str, content: backend.BaseContent):
+        pass
+
+    @classmethod
+    def register_ref(cls, alt_name: str, content: backend.Text):
+        pass
 
     def preprocess(self):
         real_parts = []

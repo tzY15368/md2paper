@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
-from typing import List, Union, Tuple
+from typing import Iterable, List, Type, Union, Tuple
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_TAB_ALIGNMENT, WD_PARAGRAPH_ALIGNMENT, WD_BREAK
 from PIL import Image as PILImage
@@ -390,6 +390,14 @@ class Block():  # content
     Heading_2 = 2
     Heading_3 = 3
     Heading_4 = 4
+    
+    @classmethod
+    def register_reference(callback):
+        pass
+
+    @classmethod
+    def register_labels(callback):
+        pass
 
     def __init__(self) -> None:
         self.title: str = None
@@ -422,6 +430,9 @@ class Block():  # content
             if not isinstance(content, BaseContent):
                 raise TypeError("expected BaseContent, got", type(content))
         self.content_list += args
+
+    def iter_content(content_type:Type[BaseContent]=None)->Iterable[BaseContent]:
+        raise NotImplementedError
 
     def render_template(self, paragraph: Paragraph = None):
         if not paragraph:
