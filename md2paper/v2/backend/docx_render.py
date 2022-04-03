@@ -11,7 +11,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
 
-from .util import *
+from md2paper.v2.backend.util import *
 
 
 class Run():
@@ -21,6 +21,7 @@ class Run():
     Formula = 8
     Superscript = 16
     Subscript = 32
+    Reference = 64 | 1  # all `[ref]` as Normal style for now
 
     def __init__(self, text: str, style: int = 0, tabstop: bool = False, transform_required: bool = True) -> None:
         self.text = text
@@ -79,6 +80,9 @@ class Text(BaseContent):
     def add_hfill(self) -> Text:
         self.runs.append(Run.get_tabstop())
         return self
+
+    def empty(self) -> bool:
+        return len(self.runs) == 0
 
     def render_paragraph(self, position: Paragraph) -> int:
         if len(position.runs) != 0:
@@ -147,8 +151,12 @@ class Image(BaseContent):
 
     image_alt_style = "图名中文"
 
-    def __init__(self, data: ImageData) -> None:
+    def __init__(self, title: str, src: str) -> None:
         super().__init__()
+        self.title = title
+        self.src = src
+
+    def set_image_data(self, data: ImageData) -> None:
         self.__image = data
 
     # 图片上下换行问题均由block管理，Image的render只负责图片和图题
@@ -221,27 +229,37 @@ class Formula(BaseContent):
         p.style = DM.get_style(self.formula_alt_style)
 
 
-class OrderedList(BaseContent):
-
-    def __init__(self, data:List[BaseContent]) -> None:
-        self.__content = data
+class ListItem:
+    def __init__(self, content_list: List[BaseContent]) -> None:
+        self.content_list = content_list
 
     def render_paragraph(self, paragraph: Paragraph):
-        for i, content in enumerate(self.__content):
-            if i == len(self.__content)-1:
+        for i, content in enumerate(self.content_list):
+            if i == len(self.content_list)-1:
                 p = paragraph
             else:
                 p = paragraph.insert_paragraph_before()
-            
-            li_run = Run(f"（{i+1}） ")
-            if isinstance(content,Text):
-                content.runs.insert(0,li_run)
+
+            li_run = Run()
+            if isinstance(content, Text):
+                content.runs.insert(0, li_run)
             else:
                 p2 = p.insert_paragraph_before()
                 Text().add_run(li_run).render_paragraph(p2)
             content.render_paragraph(p)
 
+
+class OrderedList(BaseContent):
+    def __init__(self, item_list: List[ListItem]) -> None:
+        self.item_list = item_list
+
+    def render_paragraph(self, paragraph: Paragraph):
+        for item in self.item_list:
+            item.render_paragraph(paragraph)
+
+
 # row of table
+
 class Row():
     def __init__(self, data: List[Text, str], top_border: bool = False) -> None:
         self.row: List[Text] = data
@@ -359,6 +377,13 @@ class Table(BaseContent):
                                     str(edge_data[key]))
 
 
+class Code(BaseContent):
+    def __init__(self, language: str, txt: str) -> None:
+        super().__init__()
+        self.language = language
+        self.txt = txt
+
+
 class Block():  # content
     # 每个block是多个image，formula，text的组合，内部有序
     Heading_1 = 1
@@ -422,7 +447,7 @@ class Block():  # content
             par = paragraph.insert_paragraph_before()
             content.render_paragraph(par)
             if i != len(self.content_list)-1:
-                no_spacing_content = [Text,OrderedList]
+                no_spacing_content = [Text, OrderedList]
                 if type(self.content_list[i+1]) not in no_spacing_content:
                     paragraph.insert_paragraph_before().text = "Bbb"
                 else:
