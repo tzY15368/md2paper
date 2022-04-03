@@ -11,7 +11,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
 
-from .util import *
+from md2paper.v2.backend.util import *
 
 
 class Run():
@@ -21,6 +21,7 @@ class Run():
     Formula = 8
     Superscript = 16
     Subscript = 32
+    Reference = 64 | 1  # all `[ref]` as Normal style for now
 
     def __init__(self, text: str, style: int = 0, tabstop: bool = False, transform_required: bool = True) -> None:
         self.text = text
@@ -79,6 +80,9 @@ class Text(BaseContent):
     def add_hfill(self) -> Text:
         self.runs.append(Run.get_tabstop())
         return self
+
+    def empty(self) -> bool:
+        return len(self.runs) == 0
 
     def render_paragraph(self, position: Paragraph) -> int:
         if len(position.runs) != 0:
@@ -222,9 +226,10 @@ class Formula(BaseContent):
 
 # row of table
 
+
 class OrderedList(BaseContent):
 
-    def __init__(self, data:List[BaseContent]) -> None:
+    def __init__(self, data: List[BaseContent]) -> None:
         self.__content = data
 
     def render_paragraph(self, paragraph: Paragraph):
@@ -233,14 +238,15 @@ class OrderedList(BaseContent):
                 p = paragraph
             else:
                 p = paragraph.insert_paragraph_before()
-            
+
             li_run = Run(f"（{i+1}） ")
-            if isinstance(content,Text):
-                content.runs.insert(0,li_run)
+            if isinstance(content, Text):
+                content.runs.insert(0, li_run)
             else:
                 p2 = p.insert_paragraph_before()
                 Text().add_run(li_run).render_paragraph(p2)
             content.render_paragraph(p)
+
 
 class Row():
     def __init__(self, data: List[Text, str], top_border: bool = False) -> None:
@@ -422,7 +428,7 @@ class Block():  # content
             par = paragraph.insert_paragraph_before()
             content.render_paragraph(par)
             if i != len(self.content_list)-1:
-                no_spacing_content = [Text,OrderedList]
+                no_spacing_content = [Text, OrderedList]
                 if type(self.content_list[i+1]) not in no_spacing_content:
                     paragraph.insert_paragraph_before().text = "Bbb"
                 else:
