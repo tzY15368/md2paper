@@ -32,7 +32,7 @@ e = """如果代码中出现太多的条件判断语句的话，代码就会变�
 这里看上去有点奇怪，每个状态对象都只有静态方法，并没有存储任何的实例属性数据。 实际上，所有状态信息都只存储在 Connection 实例中。 
 在基类中定义的 NotImplementedError 是为了确保子类实现了相应的方法。 这里你或许还想使用8.12小节讲解的抽象基类方式。
 设计模式中有一种模式叫状态模式，这一小节算是一个初步入门！"""
-img = Image(ImageData("../../test/classes.png","图1 classes",width_ratio=0.2))
+img = Image(ImageData("../test/classes.png","图1 classes",width_ratio=0.2))
 blk_c1.add_content(Text(e[:60]),Text(e[:60]),img,Text(e[60:]))
 blk_c1.add_content(img,Formula("公式1 真的",r"\sum^{n}_{i=0}{i}"),Text("this is eof"))
 
