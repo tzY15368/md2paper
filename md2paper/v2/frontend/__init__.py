@@ -111,8 +111,27 @@ class Paper():
         return content_list
 
     def __get_table(self, cur):
-        logging.warning('暂时未实现')
-        return None
+        def get_table_row_item(cur):
+            content_list = self.__get_contents(cur)
+            if len(content_list) == 0:
+                return None
+            elif len(content_list) == 1:
+                return content_list[0]
+            else:
+                logging.error("表格元素中不能换行")
+                return None
+
+        # 表头
+        row = [get_table_row_item(th)
+               for th in cur.find("thead").find_all("th")]
+        table = [Row(row, False)]
+
+        # 表身
+        for tr in cur.find("tbody").find_all("tr"):
+            row = [get_table_row_item(td)for td in tr.find_all("td")]
+            table.append(Row(row, False))
+
+        return Table(None, table)  # with no title
 
     def __get_math(self, cur):
         logging.warning('暂时未实现')
