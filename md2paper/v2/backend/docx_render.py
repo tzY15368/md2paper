@@ -220,7 +220,6 @@ class Formula(BaseContent):
         p.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
         p.style = DM.get_style(self.formula_alt_style)
 
-# row of table
 
 class OrderedList(BaseContent):
 
@@ -242,6 +241,7 @@ class OrderedList(BaseContent):
                 Text().add_run(li_run).render_paragraph(p2)
             content.render_paragraph(p)
 
+# row of table
 class Row():
     def __init__(self, data: List[Text, str], top_border: bool = False) -> None:
         self.row: List[Text] = data

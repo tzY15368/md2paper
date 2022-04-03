@@ -13,6 +13,12 @@ class BasePreprocessor():
     def __init__(self, root_block: backend.Block) -> None:
         self.root_block = root_block
         self.parts: List[str] = []
+
+        # 如果parts之一是*，代表任意多个level1 block
+        # 如果part中含*，如“附录* 附录标题”，代表以正则表达式匹配的-
+        #   -任意多个以附录开头的lv1 block
+        # 否则对part名进行完整匹配
+
         pass
 
     """
