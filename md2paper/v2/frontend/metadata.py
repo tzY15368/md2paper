@@ -19,29 +19,10 @@ class BaseMetadata():
     BLANK_LENGTH = 23
 
     def get_line_mapping(self) -> Dict[str, str]:
-        data = {
-            "学 院（系）：": self.school,
-            "专       业：": self.major,
-            "学 生 姓 名：": self.name,
-            "学       号：": self.number,
-            "指 导 教 师：": self.teacher,
-            "评 阅 教 师：": self.auditor,
-            "完 成 日 期：": self.finish_date
-        }
-        return data
+        raise NotImplementedError
 
     def get_title_mapping(self) -> Dict[str, str]:
-        data = {
-            "大连理工大学本科毕业设计（论文）题目": {
-                "text": self.title_zh_CN,
-                "max_len": 38
-            },
-            "The Subject of Undergraduate Graduation Project (Thesis) of DUT": {
-                "text": self.title_en,
-                "max_len": 66
-            }
-        }
-        return data
+        raise NotImplementedError
 
     @property
     def finish_date(self):

@@ -71,4 +71,4 @@ class DUTPaperPreprocessor(BasePreprocessor):
 
         # ===============================
         # check parts
-        super().preprocess()
+        return super().preprocess()

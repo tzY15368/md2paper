@@ -7,6 +7,8 @@ import bs4
 from md2paper.v2.backend.docx_render import *
 from .preprocessor import *
 from .mdext import MDExt
+from .dut_paper import DUTPaperPreprocessor
+from .dut_translation import DUTTranslationPreprocessor
 
 
 class Paper():
