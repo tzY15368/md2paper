@@ -72,8 +72,11 @@ class Paper():
             return [self.__get_math(cur)]
         elif name == 'ol':
             return [self.__get_ordered_list(cur)]
+        elif name == 'ul':
+            logging.info("暂不支持无序列表")
+            return []
         else:
-            logging.error("这是啥？" + str(cur))
+            logging.error("暂不支持，请反馈" + str(cur))
             return []
 
     def __get_super_texts(self, cur):
