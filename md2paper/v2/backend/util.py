@@ -5,10 +5,10 @@ from docx.text.paragraph import Paragraph
 import os
 import logging
 import lxml
-import sys
 from io import BytesIO, StringIO 
 
 
+SRC_ROOT = os.path.split(os.path.split(os.path.abspath(__file__))[0])[0]
 class DocNotSetException(Exception):
     pass
 

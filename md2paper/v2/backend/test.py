@@ -1,7 +1,7 @@
 
-from base import *
+from docx_render import *
 
-DM.set_doc("word-template/毕业设计（论文）模板-docx.docx")
+DM.set_doc("../../word-template/毕业设计（论文）模板-docx.docx")
 # for par in DM.get_doc().paragraphs:
 #     print(par.style.name)
 anc = "摘    要"
@@ -46,7 +46,14 @@ data = [
         Row([Text('菜花反噬！'),Text().add_run(Run(r"\sum^{n}_{i=0}{i}",style=Run.Formula)),Text('重启刘姥姥菜花宇宙')],top_border=True)
     ]
 table = Table("表1 真的是表",data)
-blk_c21.add_content(table,Text("boom!"))
+
+ol = OrderedList([
+    Text("helo, thank you, thank you very much"),
+    Text("how you doing?"),
+    img
+])
+
+blk_c21.add_content(table,Text("boom!"),ol)
 blk_c2.add_sub_block(blk_c21)
 
 h = """[1] 国家标准局信息分类编码研究所.GB/T 2659-1986 世界各国和地区名称代码[S]//全国文献工作标准化技术委员会.文献工作国家标准汇编:3.北京:中国标准出版社,1988:59-92. 

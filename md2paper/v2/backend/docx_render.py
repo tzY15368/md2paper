@@ -4,13 +4,14 @@ from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
 from typing import List, Union, Tuple
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-from .util import *
 from docx.enum.text import WD_TAB_ALIGNMENT, WD_PARAGRAPH_ALIGNMENT, WD_BREAK
 from PIL import Image as PILImage
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
+
+from util import *
 
 
 class Run():
@@ -183,7 +184,7 @@ class Formula(BaseContent):
         mathml = latex2mathml.converter.convert(latex_input)
         tree = etree.fromstring(mathml)
         xslt = etree.parse(
-            os.path.join(SRC_ROOT, 'md2paper', 'mml2omml.xsl')
+            os.path.join(SRC_ROOT, 'backend', 'mml2omml.xsl')
         )
         transform = etree.XSLT(xslt)
         new_dom = transform(tree)
@@ -221,6 +222,25 @@ class Formula(BaseContent):
 
 # row of table
 
+class OrderedList(BaseContent):
+
+    def __init__(self, data:List[BaseContent]) -> None:
+        self.__content = data
+
+    def render_paragraph(self, paragraph: Paragraph):
+        for i, content in enumerate(self.__content):
+            if i == len(self.__content)-1:
+                p = paragraph
+            else:
+                p = paragraph.insert_paragraph_before()
+            
+            li_run = Run(f"（{i+1}） ")
+            if isinstance(content,Text):
+                content.runs.insert(0,li_run)
+            else:
+                p2 = p.insert_paragraph_before()
+                Text().add_run(li_run).render_paragraph(p2)
+            content.render_paragraph(p)
 
 class Row():
     def __init__(self, data: List[Text, str], top_border: bool = False) -> None:
@@ -349,8 +369,8 @@ class Block():  # content
     def __init__(self) -> None:
         self.__title: str = None
         self.__title_centered = False
-        self.__content_list: List[Union[Text, Image, Table, Formula]] = []
-        self.__sub_blocks: List[Block] = []
+        self.content_list: List[Union[Text, Image, Table, Formula]] = []
+        self.sub_blocks: List[Block] = []
 
     # 由level决定标题的样式（heading1，2，3）
     def set_title(self, title: str, level: int, centered=False) -> Block:
@@ -363,19 +383,19 @@ class Block():  # content
 
     # returns self
     def add_sub_block(self, block: Block) -> Block:
-        self.__sub_blocks.append(block)
+        self.sub_blocks.append(block)
         return self
 
     def get_last_sub_block(self) -> Block:
-        if len(self.__sub_blocks) == 0:
+        if len(self.sub_blocks) == 0:
             raise ValueError("no available sub-blocks")
-        return self.__sub_blocks[-1]
+        return self.sub_blocks[-1]
 
     def add_content(self, *args: BaseContent):
         for content in args:
             if not isinstance(content, BaseContent):
                 raise TypeError("expected BaseContent, got", type(content))
-        self.__content_list += args
+        self.content_list += args
 
     def render_template(self, paragraph: Paragraph = None):
         if not paragraph:
@@ -397,17 +417,17 @@ class Block():  # content
             title_run = p_title.add_run()
             title_run.text = self.__title
 
-        for i, content in enumerate(self.__content_list):
+        for i, content in enumerate(self.content_list):
             par = paragraph.insert_paragraph_before()
             content.render_paragraph(par)
-            if i != len(self.__content_list)-1:
-
-                if not isinstance(self.__content_list[i+1], Text):
+            if i != len(self.content_list)-1:
+                no_spacing_content = [Text,OrderedList]
+                if type(self.content_list[i+1]) not in no_spacing_content:
                     paragraph.insert_paragraph_before().text = "Bbb"
                 else:
-                    if not isinstance(content, Text):
+                    if type(content) not in no_spacing_content:
                         paragraph.insert_paragraph_before().text = "aaa"
 
-        for block in self.__sub_blocks:
+        for block in self.sub_blocks:
             par = paragraph.insert_paragraph_before()
             block.render_template(par)
