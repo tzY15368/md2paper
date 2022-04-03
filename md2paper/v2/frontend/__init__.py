@@ -87,13 +87,13 @@ class Paper():
                 if i.contents[0].name == 'em':
                     text.add_run(Run(i.text), Run.Bold | Run.Italics)
                 else:
-                    text.add_run(Run(i.text), Run.Bold)
+                    text.add_run(Run(i.text, Run.Bold))
             elif name == "em":
-                text.add_run(Run(i.text), Run.Italics)
+                text.add_run(Run(i.text, Run.Italics))
             elif name == "math-inline":
-                text.add_run(Run(i.text), Run.Formula, transform_required=True)
+                text.add_run(Run(i.text, Run.Formula))
             elif name == "ref":
-                text.add_run(Run(i.text), Run.Reference)
+                text.add_run(Run(i.text, Run.Reference))
             else:  # 需要分段
                 if not text.empty():
                     content_list.append(text)
@@ -110,9 +110,9 @@ class Paper():
             content_list.append(text)
         return content_list
 
-    def __get_table(self, cur):
-        def get_table_row_item(cur):
-            content_list = self.__get_contents(cur)
+    def __get_table(self, table):
+        def get_table_row_item(t_):
+            content_list = self.__get_contents(t_)
             if len(content_list) == 0:
                 return None
             elif len(content_list) == 1:
@@ -123,23 +123,28 @@ class Paper():
 
         # 表头
         row = [get_table_row_item(th)
-               for th in cur.find("thead").find_all("th")]
-        table = [Row(row, False)]
+               for th in table.find("thead").find_all("th")]
+        row_list = [Row(row, False)]
 
         # 表身
-        for tr in cur.find("tbody").find_all("tr"):
+        for tr in table.find("tbody").find_all("tr"):
             row = [get_table_row_item(td)for td in tr.find_all("td")]
-            table.append(Row(row, False))
+            row_list.append(Row(row, False))
 
-        return Table(None, table)  # with no title
+        return Table(None, row_list)  # with no title
 
-    def __get_math(self, cur):
-        logging.warning('暂时未实现')
-        return None
+    def __get_math(self, math):
+        return Formula(None, math.text)  # with no title
 
-    def __get_ordered_list(self, cur):
-        logging.warning('暂时未实现')
-        return None
+    def __get_image(self, img):
+        return Image(img["alt"], img["src"])
+
+    def __get_ordered_list(self, ol):
+        def get_list_item(li):
+            return self.__get_contents(li)
+        ordered_list = [get_list_item(li)
+                        for li in ol.find_all("li", recursive=False)]
+        return OrderedList(ordered_list)
 
     """
     __Check checks if the sequence of h1 titles of blocks match that of 

@@ -151,8 +151,12 @@ class Image(BaseContent):
 
     image_alt_style = "图名中文"
 
-    def __init__(self, data: ImageData) -> None:
+    def __init__(self, title: str, src: str) -> None:
         super().__init__()
+        self.title = title
+        self.src = src
+
+    def set_image_data(self, data: ImageData) -> None:
         self.__image = data
 
     # 图片上下换行问题均由block管理，Image的render只负责图片和图题
@@ -227,25 +231,33 @@ class Formula(BaseContent):
 # row of table
 
 
-class OrderedList(BaseContent):
-
-    def __init__(self, data: List[BaseContent]) -> None:
-        self.__content = data
+class ListItem:
+    def __init__(self, content_list: List[BaseContent]) -> None:
+        self.content_list = content_list
 
     def render_paragraph(self, paragraph: Paragraph):
-        for i, content in enumerate(self.__content):
-            if i == len(self.__content)-1:
+        for i, content in enumerate(self.content_list):
+            if i == len(self.content_list)-1:
                 p = paragraph
             else:
                 p = paragraph.insert_paragraph_before()
 
-            li_run = Run(f"（{i+1}） ")
+            li_run = Run()
             if isinstance(content, Text):
                 content.runs.insert(0, li_run)
             else:
                 p2 = p.insert_paragraph_before()
                 Text().add_run(li_run).render_paragraph(p2)
             content.render_paragraph(p)
+
+
+class OrderedList(BaseContent):
+    def __init__(self, item_list: List[ListItem]) -> None:
+        self.item_list = item_list
+
+    def render_paragraph(self, paragraph: Paragraph):
+        for item in self.item_list:
+            item.render_paragraph(paragraph)
 
 
 class Row():
