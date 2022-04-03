@@ -6,11 +6,8 @@ import os
 import logging
 import lxml
 import sys
-
-sys.path.append('../..')
 from io import BytesIO, StringIO 
 
-from md2paper.md2paper import SRC_ROOT
 
 class DocNotSetException(Exception):
     pass
