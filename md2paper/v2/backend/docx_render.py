@@ -367,17 +367,18 @@ class Block():  # content
     Heading_4 = 4
 
     def __init__(self) -> None:
-        self.__title: str = None
+        self.title: str = None
+        self.level = -1
         self.__title_centered = False
         self.content_list: List[Union[Text, Image, Table, Formula]] = []
         self.sub_blocks: List[Block] = []
 
     # 由level决定标题的样式（heading1，2，3）
     def set_title(self, title: str, level: int, centered=False) -> Block:
-        self.__title = title
+        self.title = title
         if level not in range(0, 5):
             raise ValueError("invalid heading level")
-        self.__level = level
+        self.level = level
         self.__title_centered = centered
         return self
 
@@ -403,19 +404,19 @@ class Block():  # content
             paragraph = DM.get_doc().add_paragraph()
 
         #
-        if self.__title:
-            logging.debug(f"block(level={self.__level}) title: {self.__title}")
+        if self.title:
+            logging.debug(f"block(level={self.level}) title: {self.title}")
             p_title = paragraph.insert_paragraph_before()
-            p_title.style = DM.get_style('Heading '+str(self.__level))
+            p_title.style = DM.get_style('Heading '+str(self.level))
 
             if self.__title_centered:
                 p_title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             # 如果是一级，给头上（标题前面）增加分页符
-            if self.__level == self.Heading_1:
+            if self.level == self.Heading_1:
                 run = p_title.add_run()
                 run.add_break(WD_BREAK.PAGE)
             title_run = p_title.add_run()
-            title_run.text = self.__title
+            title_run.text = self.title
 
         for i, content in enumerate(self.content_list):
             par = paragraph.insert_paragraph_before()
