@@ -27,3 +27,9 @@ class BasePreprocessor():
     """
     def preprocess(self):
         pass
+
+
+class DUTPaperPreprocessor(BasePreprocessor):
+    def __init__(self, root_block: backend.Block) -> None:
+        super().__init__(root_block)
+        

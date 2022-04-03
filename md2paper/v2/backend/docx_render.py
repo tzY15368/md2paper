@@ -11,7 +11,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 import latex2mathml.converter
 
-from util import *
+from .util import *
 
 
 class Run():

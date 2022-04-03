@@ -13,7 +13,7 @@ import docx
 import tempfile
 from md2paper.mdext import MDExt
 import md2paper.dut_paper as word
-from md2paper.v2.base import *
+from md2paper.v2.backend import *
 
 debug = False
 

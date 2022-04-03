@@ -1,5 +1,6 @@
-
-from docx_render import *
+import sys
+sys.path.append('..')
+from md2paper.v2.backend.docx_render import *
 
 DM.set_doc("../../word-template/毕业设计（论文）模板-docx.docx")
 # for par in DM.get_doc().paragraphs:
