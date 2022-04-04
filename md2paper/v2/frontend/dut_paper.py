@@ -66,33 +66,57 @@ class DUTPaperPreprocessor(BasePreprocessor):
             backend.DM.delete_paragraph_by_index(pos)
         return None
 
-    def preprocess(self):
-        # compile blocks, and stuff
-        parts_handler: List[PaperPartHandler] = []
-        main_start = -1
-        main_end = -1
+    def config_preprocess(self):
+        blocks = self.root_block.sub_blocks
 
-        # 只对正文进行引用注册
-        for i, blk in enumerate(self.root_block.sub_blocks):
-            if blk.title == "正文":
-                main_start = i + 1
-            elif blk.title == "结论":
-                main_end = i - 1
+        # first pass:
+        self.if_match_register_handler(
+            blocks[0], '*', [])
+        self.if_match_register_handler(
+            blocks[1], '摘要', [])
+        self.if_match_register_handler(
+            blocks[2], 'Abstract', [])
+        self.if_match_register_handler(
+            blocks[3], '目录', [])
+        self.if_match_register_handler(
+            blocks[4], '引言', [])
+        self.if_match_register_handler(
+            blocks[5], '正文', [])
 
-        if main_start == -1 or main_end == -1 or main_start > main_end:
-            raise ValueError("invalid paper part positions")
-        
-        main_parts_blocks = self.root_block.sub_blocks[main_start:main_end+1]
-        for blk in main_parts_blocks:
-            parts_handler.append(PaperPartHandler(blk))
+        index = 6
+        main_start = index
+        cnt = 0
+        while index < len(blocks):
+            if (blocks[index].title == '结论'):
+                break
+            cnt += 1
+            self.if_match_register_handler(
+                blocks[index], '*', [])
+            index += 1
+        main_end = index - 1
 
-        for i, part in enumerate(parts_handler):
-            part.handle()
-        # 此此时已经注册了所有引用和标签，再次遍历text进行替换
-        for content in self.root_block.get_content_list(backend.Text):
-            # 替换
-            pass
+        self.if_match_register_handler(
+            blocks[main_end+1], '结论', [])
+        self.if_match_register_handler(
+            blocks[main_end+2], '参考文献', [])
 
-        # ===============================
-        # check parts
-        return super().preprocess()
+        index = main_end+3
+        append_start = index
+        cnt = 0
+        while index < len(blocks):
+            if (blocks[index].title == '修改记录'):
+                break
+            cnt += 1
+            self.if_match_register_handler(
+                blocks[index], '*', [])
+            index += 1
+        append_end = index-1
+        self.if_match_register_handler(
+            blocks[append_end+1], '致谢', [])
+        self.if_match_register_handler(
+            blocks[append_end+2], '致谢', [])
+
+        # secend pass:
+
+        for i in range(main_start, main_end+1):
+            self.register_handler(blocks[i], [])

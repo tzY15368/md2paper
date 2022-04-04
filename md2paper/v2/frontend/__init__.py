@@ -18,7 +18,7 @@ class Paper():
 
     def __init__(self, md_file_path: str, preprocessor: Type[BasePreprocessor]) -> None:
         self.block: Block = Block()
-        self.preprocessor: BasePreprocessor = preprocessor
+        self.preprocessor: BasePreprocessor = preprocessor(self.block)
 
         with open(md_file_path) as f:
             data = f.read()
@@ -60,7 +60,7 @@ class Paper():
                 last_block.add_content(*content_list)
 
         # 检查md内容是否满足preprocessor给出的要求
-        # self.__preprocess()
+        self.preprocessor.preprocess()
 
     def __get_contents(self, cur):
         name = cur.name
@@ -172,20 +172,6 @@ class Paper():
         first_line = codes.splitlines()[0]
         return Code(language=first_line.strip(), txt=codes[len(first_line):])
 
-    """
-    __Check checks if the sequence of h1 titles of blocks match that of 
-    the given preprocessor
-    """
-
-    def __preprocess(self):
-        parts = self.preprocessor.preprocess()
-        j = 0
-        # TODO: Check if blocks' titles match `parts``
-        # ...
-        if len(parts) != 0:
-            logging.warning(
-                f"check: part {parts[0]} or more are missing, check preprocessor for details")
-        pass
     """
     render reads from `template_file_path`, 
     performs pre-processing with provided Preprocessor,

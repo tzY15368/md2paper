@@ -486,6 +486,11 @@ class Block():  # content
                 result += blk.get_content_list(content_type, recursive)
         return result
 
+    def title_match(self, title: str) -> bool:
+        if title == '*':
+            return True
+        return self.title.strip() == title
+
     def render_template(self, paragraph: Paragraph = None):
         if not paragraph:
             # 最后开始append

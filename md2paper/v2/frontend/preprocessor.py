@@ -8,23 +8,29 @@ from md2paper.v2 import backend
 
 
 class PaperPartHandler():
-    def __init__(self, block: backend.Block) -> None:
+    def __init__(self, block: backend.Block, functions: List[Callable]) -> None:
         self.block = block
-        # 这里目前是写死的，后续可以放开
-        self.callbacks: List[Callable] = [
-            backend.Block.handle_labels,
-            backend.Block.handle_references
-        ]
+        self.functions = functions
 
-        # 写死的map
-        self.method_map = {
-            backend.Block.handle_labels: BasePreprocessor.register_label,
-            backend.Block.handle_references: BasePreprocessor.register_ref
-        }
+    """
+    apply all functions to one backend.Block or subclass of backend.BaseContent
+    """
+
+    def apply_functions(self, boc):
+        for f in self.functions:
+            f(boc)
 
     def handle(self):
-        for callback in self.callbacks:
-            callback(self.block,self.method_map[callback])
+        self.handle_block(self.block)
+
+    def handle_block(self, block: backend.Block):
+        self.apply_functions(block)
+
+        for content in self.block.get_content_list():
+            self.apply_functions(content)
+
+        for blk in block.sub_blocks:
+            self.handle_block(blk)
 
 
 class BasePreprocessor():
@@ -33,6 +39,8 @@ class BasePreprocessor():
     def __init__(self, root_block: backend.Block) -> None:
         self.root_block = root_block
         self.parts: List[str] = []
+
+        self.handlers: List[PaperPartHandler] = []
 
         # 如果parts之一是*，代表任意多个level1 block
         # 如果part中含*，如“附录* 附录标题”，代表以正则表达式匹配的-
@@ -82,15 +90,27 @@ class BasePreprocessor():
             i = i + 1
 
     @classmethod
-    def register_label(cls, alt_name: str, content: backend.BaseContent, index:int):
+    def register_label(cls, alt_name: str, content: backend.BaseContent, index: int):
         pass
 
     @classmethod
     def register_ref(cls, alt_name: str, content: backend.Text):
         pass
 
+    def register_handler(self, block: backend.Block, functions: List[Callable]):
+        self.handlers.append(PaperPartHandler(block, functions))
+
+    def if_match_register_handler(self, block: backend.Block, title: str, functions: List[Callable]) -> bool:
+        if block.title_match(title):
+            self.register_handler(block, functions)
+
+    def config_preprocess(self):
+        pass
+
+    def do_preprocess(self):
+        for part in self.handlers:
+            part.handle()
+
     def preprocess(self):
-        real_parts = []
-        for blk in self.root_block.sub_blocks:
-            real_parts.append(blk.title)
-        self.__compare_parts()
+        self.config_preprocess()
+        self.do_preprocess()
