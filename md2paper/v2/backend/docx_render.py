@@ -77,6 +77,8 @@ class Text(BaseContent):
             self.runs.append(Run(raw_text, style))
 
     def add_run(self, run: Run) -> Text:
+        if not isinstance(run,Run):
+            raise TypeError("Text: expected Run, got {}".format(type(run)))
         self.runs.append(run)
         return self
 
@@ -164,6 +166,7 @@ class Image(BaseContent):
         super().__init__()
         self.title = title
         self.src = src
+        self.__image = None
 
     def set_image_data(self, data: ImageData) -> None:
         self.__image = data
@@ -174,9 +177,9 @@ class Image(BaseContent):
 
         p_text.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p_text.style = DM.get_style(self.image_alt_style)
-        p_text.text = self.__image.img_alt
+        p_text.text = self.title
 
-        if self.__image.img_src:
+        if self.__image and self.__image.img_src:
             p_img = paragraph.insert_paragraph_before()
             r = p_img.add_run()
             r.add_picture(self.__image.img_src, *
@@ -240,6 +243,9 @@ class Formula(BaseContent):
 
 class ListItem:
     def __init__(self, content_list: List[BaseContent]) -> None:
+        for c in content_list:
+            if not isinstance(c,BaseContent):
+                raise TypeError(f"listitem: expected BaseContent, got {type(c)}")
         self.content_list = content_list
 
     def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
@@ -257,7 +263,7 @@ class ListItem:
             else:
                 p = paragraph.insert_paragraph_before()
 
-            li_run = Text("TODO")
+            li_run = Run("TODO")
             if isinstance(content, Text):
                 content.runs.insert(0, li_run)
             else:

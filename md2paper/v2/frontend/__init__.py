@@ -94,7 +94,7 @@ class Paper():
                 text.add_run(Run(i.text, style=Run.Normal))
             elif name == "strong":
                 if not len(i.contents) == 1:
-                    print("只允许粗斜体，不允许复杂嵌套")
+                    logging.warning("mdparser: 只允许粗斜体，不允许复杂嵌套")
                 if i.contents[0].name == 'em':
                     text.add_run(Run(i.text), Run.Bold | Run.Italics)
                 else:
@@ -154,7 +154,7 @@ class Paper():
 
     def __get_ordered_list(self, ol):
         def get_list_item(li):
-            if (li.contents[0].text == "\n"):  # <p>
+            if (getattr(li.contents[0],"text",None) == "\n"):  # <p>
                 content_list_list = [self.__get_contents(cur)
                                      for cur in li.contents]
                 content_list = reduce(

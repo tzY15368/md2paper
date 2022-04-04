@@ -30,7 +30,10 @@ class BaseMetadata():
             return self.__finish_date
         else:
             now = datetime.datetime.now()
-            return now.strftime("%Y年%m月%d日")
+            return now.strftime("%Y年%m月%d日".encode('unicode_escape')
+                                .decode('utf8'))\
+                .encode('utf-8')\
+                .decode('unicode_escape')
 
     @finish_date.setter
     def finish_date(self, value):
