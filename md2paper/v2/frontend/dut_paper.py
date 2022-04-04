@@ -2,7 +2,7 @@ from md2paper.v2 import backend
 from docx.text.paragraph import Paragraph
 from typing import List, Dict
 from .metadata import BaseMetadata
-from .preprocessor import BasePreprocessor, PaperPartPreprocessor
+from .preprocessor import BasePreprocessor, PaperPartHandler
 
 
 class DUTPaperMetaData(BaseMetadata):
@@ -54,7 +54,6 @@ class DUTPaperPreprocessor(BasePreprocessor):
             "正文", self.MATCH_ANY, "结论", "参考文献",
             "附录.*", "修改记录", "致谢"
         ]
-        self.parts_handler = map(PaperPartPreprocessor, self.parts)
 
     def initialize_template(self) -> Paragraph:
         meta = DUTPaperMetaData()
@@ -69,12 +68,28 @@ class DUTPaperPreprocessor(BasePreprocessor):
 
     def preprocess(self):
         # compile blocks, and stuff
+        parts_handler: List[PaperPartHandler] = []
+        main_start = -1
+        main_end = -1
+
+        # 只对正文进行引用注册
+        for i, blk in enumerate(self.root_block.sub_blocks):
+            if blk.title == "正文":
+                main_start = i + 1
+            elif blk.title == "结论":
+                main_end = i - 1
+
+        if main_start == -1 or main_end == -1 or main_start > main_end:
+            raise ValueError("invalid paper part positions")
         
-        # TODO: THIS CODE WON'T WORK, parts_handler needs filtering
-        for i, part in enumerate(self.parts_handler):
-            part.call_methods(i)
+        main_parts_blocks = self.root_block.sub_blocks[main_start:main_end+1]
+        for blk in main_parts_blocks:
+            parts_handler.append(PaperPartHandler(blk))
+
+        for i, part in enumerate(parts_handler):
+            part.handle()
         # 此此时已经注册了所有引用和标签，再次遍历text进行替换
-        for content in self.root_block.iter_content(backend.Text):
+        for content in self.root_block.get_content_list(backend.Text):
             # 替换
             pass
 

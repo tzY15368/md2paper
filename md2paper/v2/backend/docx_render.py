@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
-from typing import Iterable, List, Type, Union, Tuple
+from typing import Callable, List, Type, Tuple
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_TAB_ALIGNMENT, WD_PARAGRAPH_ALIGNMENT, WD_BREAK
 from PIL import Image as PILImage
@@ -390,20 +390,32 @@ class Block():  # content
     Heading_2 = 2
     Heading_3 = 3
     Heading_4 = 4
-    
-    @classmethod
-    def register_reference(callback):
-        pass
 
     @classmethod
-    def register_labels(callback):
-        pass
+    def handle_references(cls, blk: Block, reg_callback: Callable):
+        for content in blk.get_content_list(Text):
+            # TODO:检查引用
+            alt_name = "xxx"
+            if True:
+                reg_callback(alt_name, content)
+
+    @classmethod
+    def handle_labels(cls, blk: Block, reg_callback: Callable):
+        # 从block title推断index
+        if not blk.title or blk.level != Block.Heading_1 or \
+                (len(blk.title) > 1 and not blk.title[0].isdigit()):
+            raise ValueError("unexpected index, should be index of chapter")
+        index = int(blk.title[0])
+
+        for content in blk.get_content_list():
+            if type(content) in [Text, Image, Formula]:
+                reg_callback(content.title, content, index)
 
     def __init__(self) -> None:
         self.title: str = None
         self.level = -1
         self.__title_centered = False
-        self.content_list: List[Union[Text, Image, Table, Formula]] = []
+        self.content_list: List[BaseContent] = []
         self.sub_blocks: List[Block] = []
 
     # 由level决定标题的样式（heading1，2，3）
@@ -431,8 +443,16 @@ class Block():  # content
                 raise TypeError("expected BaseContent, got", type(content))
         self.content_list += args
 
-    def iter_content(content_type:Type[BaseContent]=None)->Iterable[BaseContent]:
-        raise NotImplementedError
+    # get_content_list recursively adds content to a list.
+    # orderedLists are expanded
+    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+        result: List[BaseContent] = []
+        for content in self.content_list:
+            if content_type == None or isinstance(content, content_type):
+                result.append(content)
+        for blk in self.sub_blocks:
+            result += blk.get_content_list()
+        return result
 
     def render_template(self, paragraph: Paragraph = None):
         if not paragraph:

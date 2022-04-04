@@ -7,23 +7,24 @@ import re
 from md2paper.v2 import backend
 
 
-class PaperPartPreprocessor():
+class PaperPartHandler():
     def __init__(self, block: backend.Block) -> None:
         self.block = block
         # 这里目前是写死的，后续可以放开
         self.callbacks: List[Callable] = [
-            backend.Block.register_labels,
-            backend.Block.register_reference
+            backend.Block.handle_labels,
+            backend.Block.handle_references
         ]
 
         # 写死的map
         self.method_map = {
-            backend.Block.register_labels: BasePreprocessor.register_label,
-            backend.Block.register_reference: BasePreprocessor.register_ref
+            backend.Block.handle_labels: BasePreprocessor.register_label,
+            backend.Block.handle_references: BasePreprocessor.register_ref
         }
 
-    def call_methods(index:int):
-        pass
+    def handle(self):
+        for callback in self.callbacks:
+            callback(self.block,self.method_map[callback])
 
 
 class BasePreprocessor():
@@ -81,7 +82,7 @@ class BasePreprocessor():
             i = i + 1
 
     @classmethod
-    def register_label(cls, alt_name: str, content: backend.BaseContent):
+    def register_label(cls, alt_name: str, content: backend.BaseContent, index:int):
         pass
 
     @classmethod
