@@ -96,7 +96,7 @@ class Text(BaseContent):
     def render_paragraph(self, position: Paragraph) -> int:
         if len(position.runs) != 0:
             logging.warning(
-                "Text: existing content in paragraph", position.text)
+                "Text: existing content in paragraph {}".format(position.text))
 
         for run in self.runs:
             if not run.is_tabstop():
