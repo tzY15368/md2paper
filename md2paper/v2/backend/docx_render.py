@@ -57,6 +57,9 @@ class Run():
 class BaseContent():
     # 在指定offset 填充paragraph，如果内部内容为多个paragraph，
     # 自动【向上】填充paragraph
+    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+        return []
+
     def render_paragraph(self, paragraph: Paragraph):
         raise NotImplementedError
 
@@ -233,6 +236,14 @@ class ListItem:
     def __init__(self, content_list: List[BaseContent]) -> None:
         self.content_list = content_list
 
+    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+        result: List[BaseContent] = []
+        for content in self.content_list:
+            if content_type == None or isinstance(content, content_type):
+                result.append(content)
+            result += content.get_content_list(content_type)
+        return result
+
     def render_paragraph(self, paragraph: Paragraph):
         for i, content in enumerate(self.content_list):
             if i == len(self.content_list)-1:
@@ -253,6 +264,12 @@ class OrderedList(BaseContent):
     def __init__(self, item_list: List[ListItem]) -> None:
         self.item_list = item_list
 
+    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+        result: List[BaseContent] = [
+            item.get_content_list(content_type)
+            for item in self.item_list]
+        return result
+
     def render_paragraph(self, paragraph: Paragraph):
         for item in self.item_list:
             item.render_paragraph(paragraph)
@@ -264,6 +281,13 @@ class Row():
     def __init__(self, data: List[Text, str], top_border: bool = False) -> None:
         self.row: List[Text] = data
         self.has_top_border = top_border
+
+    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+        result: List[BaseContent] = []
+        for content in self.row:
+            if content_type == None or isinstance(content, content_type):
+                result.append(content)
+        return result
 
 
 class Table(BaseContent):
@@ -289,6 +313,12 @@ class Table(BaseContent):
                 "invalid column width params, got {}, want {}", len(widths), self.__cols)
         self.__auto_fit = False
         self.__columns_width = widths
+
+    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+        result: List[BaseContent] = [
+            row.get_content_list(content_type)
+            for row in self.__table]
+        return result
 
     def render_paragraph(self, paragraph: Paragraph):
         p = paragraph
@@ -444,14 +474,16 @@ class Block():  # content
         self.content_list += args
 
     # get_content_list recursively adds content to a list.
-    # orderedLists are expanded
-    def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
+    # content in content are expanded
+    def get_content_list(self, content_type: Type[BaseContent] = None, recursive: bool = False) -> List[BaseContent]:
         result: List[BaseContent] = []
         for content in self.content_list:
             if content_type == None or isinstance(content, content_type):
                 result.append(content)
-        for blk in self.sub_blocks:
-            result += blk.get_content_list()
+            result += content.get_content_list(content_type)
+        if recursive:
+            for blk in self.sub_blocks:
+                result += blk.get_content_list(content_type, recursive)
         return result
 
     def render_template(self, paragraph: Paragraph = None):

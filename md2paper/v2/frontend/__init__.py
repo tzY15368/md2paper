@@ -161,7 +161,7 @@ class Paper():
                     lambda x, y: x+y, content_list_list)  # flatten
             else:  # text
                 content_list = self.__get_super_texts(li)
-            return content_list
+            return ListItem(content_list)
 
         ordered_list = [get_list_item(li)
                         for li in ol.find_all("li", recursive=False)]
