@@ -1,6 +1,8 @@
+from asyncio.log import logger
+import logging
 from md2paper.v2 import backend
 from docx.text.paragraph import Paragraph
-from typing import List, Dict
+from typing import List, Dict, Union
 from .metadata import BaseMetadata
 from .preprocessor import BasePreprocessor, PaperPartHandler
 
@@ -66,6 +68,30 @@ class DUTPaperPreprocessor(BasePreprocessor):
             backend.DM.delete_paragraph_by_index(pos)
         return None
 
+    def f_set_abstract_format(self):
+        def set_abstract_format(boc: Union[backend.BaseContent, backend.Block]):
+            if isinstance(boc, backend.Block):
+                if boc.title in ['摘要', 'Abstract']:
+                    keyword_text: backend.Text = boc.content_list[-1]
+                    keyword_text.force_style = '关键词'
+                    if len(keyword_text.runs) != 1:
+                        logging.error(boc.title + ' 的关键词格式错误')
+                    keyword_run = keyword_text.runs[0]
+                    if boc.title == '摘要':
+                        if keyword_run.text.find('关键词：') != 0:
+                            logging.error(boc.title + ' 的关键词要以 "关键词：" 开头')
+                    else:
+                        if keyword_run.text.find('Key Words:') != 0:
+                            logging.error(
+                                boc.title + ' 的关键词要以 "Key Words:" 开头')
+                        keyword_run.text.replace(':', '：')
+                        keyword_run.text.replace(';', '；')
+                        keyword_run.text = self.rbk(keyword_run.text)
+                    # do more format check here
+                else:
+                    logging.error('错误的摘要标题: ' + boc.title)
+        return set_abstract_format
+
     def preprocess(self):
         blocks = self.root_block.sub_blocks
 
@@ -73,9 +99,9 @@ class DUTPaperPreprocessor(BasePreprocessor):
         self.match_then_handler(
             blocks[0], '*', [self.f_rbk_text(), self.f_get_metadata()])
         self.match_then_handler(
-            blocks[1], '摘要', [])
+            blocks[1], '摘要', [self.f_rbk_text(), self.f_set_abstract_format()])
         self.match_then_handler(
-            blocks[2], 'Abstract', [])
+            blocks[2], 'Abstract', [self.f_rbk_text(), self.f_set_abstract_format()])
         self.match_then_handler(
             blocks[3], '目录', [])
         self.match_then_handler(

@@ -257,7 +257,7 @@ class ListItem:
             else:
                 p = paragraph.insert_paragraph_before()
 
-            li_run = Run()
+            li_run = Text("TODO")
             if isinstance(content, Text):
                 content.runs.insert(0, li_run)
             else:
@@ -460,7 +460,7 @@ class Block():  # content
         if level not in range(0, 5):
             raise ValueError("invalid heading level")
         self.level = level
-        self.__title_centered = centered
+        self.title_centered = centered
         return self
 
     # returns self
