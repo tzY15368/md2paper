@@ -66,21 +66,21 @@ class DUTPaperPreprocessor(BasePreprocessor):
             backend.DM.delete_paragraph_by_index(pos)
         return None
 
-    def config_preprocess(self):
+    def preprocess(self):
         blocks = self.root_block.sub_blocks
 
         # first pass:
-        self.if_match_register_handler(
-            blocks[0], '*', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
+            blocks[0], '*', [self.f_rbk_text(), self.f_get_metadata()])
+        self.match_then_handler(
             blocks[1], '摘要', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[2], 'Abstract', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[3], '目录', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[4], '引言', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[5], '正文', [])
 
         index = 6
@@ -90,14 +90,14 @@ class DUTPaperPreprocessor(BasePreprocessor):
             if (blocks[index].title == '结论'):
                 break
             cnt += 1
-            self.if_match_register_handler(
+            self.match_then_handler(
                 blocks[index], '*', [])
             index += 1
         main_end = index - 1
 
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[main_end+1], '结论', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[main_end+2], '参考文献', [])
 
         index = main_end+3
@@ -107,16 +107,16 @@ class DUTPaperPreprocessor(BasePreprocessor):
             if (blocks[index].title == '修改记录'):
                 break
             cnt += 1
-            self.if_match_register_handler(
+            self.match_then_handler(
                 blocks[index], '*', [])
             index += 1
         append_end = index-1
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[append_end+1], '致谢', [])
-        self.if_match_register_handler(
+        self.match_then_handler(
             blocks[append_end+2], '致谢', [])
 
         # secend pass:
 
         for i in range(main_start, main_end+1):
-            self.register_handler(blocks[i], [])
+            self.handler(blocks[i], [])

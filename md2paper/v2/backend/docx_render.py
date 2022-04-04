@@ -84,6 +84,12 @@ class Text(BaseContent):
         self.runs.append(Run.get_tabstop())
         return self
 
+    def raw_text(self):
+        s = ''
+        for run in self.runs:
+            s += run.text
+        return s
+
     def empty(self) -> bool:
         return len(self.runs) == 0
 
@@ -301,11 +307,11 @@ class Table(BaseContent):
         self.__auto_fit = True
         self.__columns_width: List[float] = []
         self.__title = title
-        self.__table: List[Row] = table
+        self.table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
-        self.__cols = len(self.__table[0].row)
-        self.__rows = len(self.__table)
+        self.__cols = len(self.table[0].row)
+        self.__rows = len(self.table)
 
     def set_columns_width(self, widths: List[float]):
         if len(widths) != self.__cols:
@@ -317,7 +323,7 @@ class Table(BaseContent):
     def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
         result: List[BaseContent] = [
             row.get_content_list(content_type)
-            for row in self.__table]
+            for row in self.table]
         return result
 
     def render_paragraph(self, paragraph: Paragraph):
@@ -335,7 +341,7 @@ class Table(BaseContent):
         paragraph._p.addnext(table._tbl)
 
         # 填充内容, 编辑表格样式
-        for i, row in enumerate(self.__table):
+        for i, row in enumerate(self.table):
             for j, cell_content in enumerate(row.row):
                 cell = table.rows[i].cells[j]
                 cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER

@@ -1,10 +1,13 @@
 import copy
 import logging
-from typing import List, Callable
+from typing import List, Callable, Union, Dict
 from docx.text.paragraph import Paragraph
 import re
 
 from md2paper.v2 import backend
+
+
+# 处理文本
 
 
 class PaperPartHandler():
@@ -21,12 +24,13 @@ class PaperPartHandler():
             f(boc)
 
     def handle(self):
-        self.handle_block(self.block)
+        if len(self.functions):
+            self.handle_block(self.block)
 
     def handle_block(self, block: backend.Block):
         self.apply_functions(block)
 
-        for content in self.block.get_content_list():
+        for content in block.get_content_list():
             self.apply_functions(content)
 
         for blk in block.sub_blocks:
@@ -41,6 +45,8 @@ class BasePreprocessor():
         self.parts: List[str] = []
 
         self.handlers: List[PaperPartHandler] = []
+
+        self.metadata: Dict[str, str] = {}
 
         # 如果parts之一是*，代表任意多个level1 block
         # 如果part中含*，如“附录* 附录标题”，代表以正则表达式匹配的-
@@ -97,20 +103,53 @@ class BasePreprocessor():
     def register_ref(cls, alt_name: str, content: backend.Text):
         pass
 
-    def register_handler(self, block: backend.Block, functions: List[Callable]):
-        self.handlers.append(PaperPartHandler(block, functions))
+    def rbk(self, text: str):  # remove_blank
+        # 删除换行符
+        text = text.replace("\n", " ")
+        text = text.replace("\r", "")
+        text = text.strip(' ')
 
-    def if_match_register_handler(self, block: backend.Block, title: str, functions: List[Callable]) -> bool:
+        cn_char = u'[\u4e00-\u9fa5。，：《》、（）“”‘’\u00a0]'
+        # 中文字符后空格
+        should_replace_list = re.compile(
+            cn_char + u' +').findall(text)
+        # 中文字符前空格
+        should_replace_list += re.compile(
+            u' +' + cn_char).findall(text)
+        # 删除空格
+        for i in should_replace_list:
+            if i == u' ':
+                continue
+            new_i = i.strip(" ")
+            text = text.replace(i, new_i)
+        text = text.replace("\u00a0", " ")  # 替换为普通空格
+        return text
+
+    def f_rbk_text(self):
+        def rbk_text(boc: Union[backend.BaseContent, backend.Block]):
+            if isinstance(boc, backend.Text):
+                for run in boc.runs:
+                    run.text = self.rbk(run.text)
+        return rbk_text
+
+    def f_get_metadata(self):
+        def get_metadata(boc: Union[backend.BaseContent, backend.Block]):
+            if isinstance(boc, backend.Table):
+                for row in boc.table[1:]:
+                    self.metadata[row.row[0].raw_text()
+                                  ] = row.row[1].raw_text()
+            elif isinstance(boc, backend.Block) and boc.level == 1:
+                self.metadata['title_zh_CN'] = self.rbk(boc.title)
+                self.metadata['title_en'] = self.rbk(boc.sub_blocks[0].title)
+        return get_metadata
+
+    def handler(self, block: backend.Block, functions: List[Callable]):
+        pph = PaperPartHandler(block, functions)
+        pph.handle()
+
+    def match_then_handler(self, block: backend.Block, title: str, functions: List[Callable]) -> bool:
         if block.title_match(title):
-            self.register_handler(block, functions)
-
-    def config_preprocess(self):
-        pass
-
-    def do_preprocess(self):
-        for part in self.handlers:
-            part.handle()
+            self.handler(block, functions)
 
     def preprocess(self):
-        self.config_preprocess()
-        self.do_preprocess()
+        pass
