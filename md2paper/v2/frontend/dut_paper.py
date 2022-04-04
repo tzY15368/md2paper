@@ -102,14 +102,14 @@ class DUTPaperPreprocessor(BasePreprocessor):
             blocks[1], '摘要', [self.f_rbk_text(), self.f_set_abstract_format()])
         self.match_then_handler(
             blocks[2], 'Abstract', [self.f_rbk_text(), self.f_set_abstract_format()])
+        if blocks[3].title_match('目录'):
+            blocks.remove(blocks[3])
         self.match_then_handler(
-            blocks[3], '目录', [])
+            blocks[3], '引言', [])
         self.match_then_handler(
-            blocks[4], '引言', [])
-        self.match_then_handler(
-            blocks[5], '正文', [])
+            blocks[4], '正文', [])
 
-        index = 6
+        index = 5
         main_start = index
         cnt = 0
         while index < len(blocks):
@@ -138,7 +138,7 @@ class DUTPaperPreprocessor(BasePreprocessor):
             index += 1
         append_end = index-1
         self.match_then_handler(
-            blocks[append_end+1], '致谢', [])
+            blocks[append_end+1], '修改记录', [])
         self.match_then_handler(
             blocks[append_end+2], '致谢', [])
 

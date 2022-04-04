@@ -150,6 +150,8 @@ class BasePreprocessor():
     def match_then_handler(self, block: backend.Block, title: str, functions: List[Callable]) -> bool:
         if block.title_match(title):
             self.handler(block, functions)
+        else:
+            logging.warning(title + " 匹配失败")
 
     def preprocess(self):
         pass
