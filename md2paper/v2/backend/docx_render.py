@@ -425,6 +425,11 @@ class Code(BaseContent):
         self.language = language
         self.txt = txt
 
+    def render_paragraph(self, paragraph: Paragraph):
+        # TODO: FIX ME
+        logging.warning("code: render: not yet implemented")
+        paragraph.add_run("code:{}:{}".format(self.language,self.txt))
+
 
 class Block():  # content
     # 每个block是多个image，formula，text的组合，内部有序
@@ -481,7 +486,7 @@ class Block():  # content
 
     def add_content(self, *args: BaseContent):
         for content in args:
-            if not isinstance(content, BaseContent):
+            if not isinstance(content, BaseContent) or type(content)==BaseContent:
                 raise TypeError("expected BaseContent, got", type(content))
         self.content_list += args
 
