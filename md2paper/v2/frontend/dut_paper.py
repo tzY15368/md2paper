@@ -1,8 +1,7 @@
-from asyncio.log import logger
 import logging
 from md2paper.v2 import backend
 from docx.text.paragraph import Paragraph
-from typing import List, Dict, Union
+from typing import List, Dict, Tuple, Union
 from .metadata import BaseMetadata
 from .preprocessor import BasePreprocessor, PaperPartHandler
 
@@ -21,15 +20,15 @@ class DUTPaperMetaData(BaseMetadata):
         self.title_en: str = None
 
     # override
-    def get_line_mapping(self) -> Dict[str, str]:
+    def get_line_mapping(self) -> Dict[str, Tuple[str, str]]:
         data = {
-            "学 院（系）：": self.school,
-            "专       业：": self.major,
-            "学 生 姓 名：": self.name,
-            "学       号：": self.number,
-            "指 导 教 师：": self.teacher,
-            "评 阅 教 师：": self.auditor,
-            "完 成 日 期：": self.finish_date
+            "学 院（系）：": (self.school, 'school'),
+            "专       业：": (self.major, 'major'),
+            "学 生 姓 名：": (self.name, 'name'),
+            "学       号：": (self.number, 'number'),
+            "指 导 教 师：": (self.teacher, 'teacher'),
+            "评 阅 教 师：": (self.auditor, 'auditor'),
+            "完 成 日 期：": (self.finish_date, 'finish_date')
         }
         return data
 
@@ -60,6 +59,16 @@ class DUTPaperPreprocessor(BasePreprocessor):
     def initialize_template(self) -> Paragraph:
         meta = DUTPaperMetaData()
         # ... fill metadata
+        # TODO: REMOVE ME
+        meta.set_fields({
+            "学院（系）": "abc",
+            "专业": "def",
+            "学生姓名": "sdfsdf",
+            "学号": "234234",
+            "指导教师": "nnnnnnnnnnn",
+        })
+        # TODO: END OF TODO
+        print(meta.__dict__)
         meta.render_template()
 
         anc = "摘    要"

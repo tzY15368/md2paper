@@ -1,28 +1,35 @@
-from typing import Dict
+from typing import Dict, Tuple
 import datetime
 import logging
 from md2paper.v2 import backend
 
 
 class BaseMetadata():
-    school: str = None
-    major: str = None
-    name: str = None
-    number: str = None
-    teacher: str = None
-    auditor: str = None
     __finish_date: str = None
-    title_zh_CN: str = None
-    title_en: str = None
 
     # 封面个人信息留空长度
     BLANK_LENGTH = 23
 
-    def get_line_mapping(self) -> Dict[str, str]:
+    # 返回的tuple[0]是field的值，[1]是field的attr名，
+    def get_line_mapping(self) -> Dict[str, Tuple[str, str]]:
         raise NotImplementedError
 
     def get_title_mapping(self) -> Dict[str, str]:
         raise NotImplementedError
+
+    def set_fields(self, data: Dict[str, str]):
+        line_mapping = self.get_line_mapping()
+        for field_cn_name in line_mapping:
+            trimmed_name = field_cn_name.strip().replace(' ', '')
+            if trimmed_name[-1] != "：":
+                raise ValueError(
+                    "metadata: unexpected field_cn_name: "+trimmed_name)
+            trimmed_name = trimmed_name[:-1]
+            if trimmed_name not in data:
+                logging.warning(f"metadata: field {trimmed_name} went missing")
+            else:
+                setattr(self, line_mapping[field_cn_name]
+                        [1], data[trimmed_name])
 
     @property
     def finish_date(self):
@@ -97,8 +104,8 @@ class BaseMetadata():
 
         mapping = self.get_line_mapping()
         for field in mapping:
-            if not mapping[field]:
+            if not mapping[field][0]:
                 continue
             offset = backend.DM.get_anchor_position(field) - 1
-            data = self.__fill_blank(self.BLANK_LENGTH, mapping[field])
+            data = self.__fill_blank(self.BLANK_LENGTH, mapping[field][0])
             backend.DM.get_doc().paragraphs[offset].runs[-1].text = data

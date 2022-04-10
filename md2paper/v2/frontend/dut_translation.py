@@ -1,6 +1,6 @@
 from md2paper.v2 import backend
 from docx.text.paragraph import Paragraph
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from .metadata import BaseMetadata
 from .preprocessor import BasePreprocessor
 
@@ -13,12 +13,10 @@ class DUTTranslationMetaData(BaseMetadata):
         self.name: str = None
         self.number: str = None
         self.teacher: str = None
-        self.auditor: str = None
         self.__finish_date: str = None
         self.title_zh_CN: str = None
         self.title_en: str = None
-    
-    
+
     def get_title_mapping(self) -> Dict[str, str]:
         data = {
             "外文的中文题目": {
@@ -32,16 +30,17 @@ class DUTTranslationMetaData(BaseMetadata):
         }
         return data
 
-    def get_line_mapping(self) -> Dict[str, str]:
+    def get_line_mapping(self) -> Dict[str, Tuple[str, str]]:
         data = {
-            "学 部（院）：": self.school,
-            "专       业：": self.major,
-            "学 生 姓 名：": self.name,
-            "学       号：": self.number,
-            "指 导 教 师：": self.teacher,
-            "完 成 日 期：": self.finish_date
+            "学 部（院）：": (self.school, 'school'),
+            "专       业：": (self.major, 'major'),
+            "学 生 姓 名：": (self.name, 'name'),
+            "学       号：": (self.number, 'number'),
+            "指 导 教 师：": (self.teacher, 'teacher'),
+            "完 成 日 期：": (self.finish_date, 'finish_date')
         }
         return data
+
 
 class DUTTranslationPreprocessor(BasePreprocessor):
     def __init__(self, root_block: backend.Block) -> None:
