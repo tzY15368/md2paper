@@ -87,9 +87,11 @@ class DUTPaperPreprocessor(BasePreprocessor):
                         logging.error(boc.title + ' 的关键词格式错误')
                     keyword_run = keyword_text.runs[0]
                     if boc.title == '摘要':
+                        boc.set_title('摘    要', 1, True)
                         if keyword_run.text.find('关键词：') != 0:
                             logging.error(boc.title + ' 的关键词要以 "关键词：" 开头')
                     else:
+                        boc.set_title('Abstract', 1, True)
                         if keyword_run.text.find('Key Words:') != 0:
                             logging.error(
                                 boc.title + ' 的关键词要以 "Key Words:" 开头')
