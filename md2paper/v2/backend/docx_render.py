@@ -78,7 +78,7 @@ class Text(BaseContent):
             self.runs.append(Run(raw_text, style))
 
     def add_run(self, run: Run) -> Text:
-        if not isinstance(run,Run):
+        if not isinstance(run, Run):
             raise TypeError("Text: expected Run, got {}".format(type(run)))
         self.runs.append(run)
         return self
@@ -245,8 +245,9 @@ class Formula(BaseContent):
 class ListItem:
     def __init__(self, content_list: List[BaseContent]) -> None:
         for c in content_list:
-            if not isinstance(c,BaseContent):
-                raise TypeError(f"listitem: expected BaseContent, got {type(c)}")
+            if not isinstance(c, BaseContent):
+                raise TypeError(
+                    f"listitem: expected BaseContent, got {type(c)}")
         self.content_list = content_list
 
     def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
@@ -313,7 +314,8 @@ class Table(BaseContent):
         super().__init__()
         self.__auto_fit = True
         self.__columns_width: List[float] = []
-        self.__title = title
+        self.title = title
+        self.ali: str = None  # alias
         self.table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
@@ -337,7 +339,7 @@ class Table(BaseContent):
         p = paragraph
         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p.style = DM.get_style(self.alt_style)
-        p.text = self.__title
+        p.text = self.title
         table = DM.get_doc().add_table(rows=self.__rows, cols=self.__cols, style='Table Grid')
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = table.allow_autofit = self.__auto_fit
@@ -429,7 +431,7 @@ class Code(BaseContent):
     def render_paragraph(self, paragraph: Paragraph):
         # TODO: FIX ME
         logging.warning("code: render: not yet implemented")
-        paragraph.add_run("code:{}:{}".format(self.language,self.txt))
+        paragraph.add_run("code:{}:{}".format(self.language, self.txt))
 
 
 class Block():  # content
@@ -487,7 +489,7 @@ class Block():  # content
 
     def add_content(self, *args: BaseContent):
         for content in args:
-            if not isinstance(content, BaseContent) or type(content)==BaseContent:
+            if not isinstance(content, BaseContent) or type(content) == BaseContent:
                 raise TypeError("expected BaseContent, got", type(content))
         self.content_list += args
 

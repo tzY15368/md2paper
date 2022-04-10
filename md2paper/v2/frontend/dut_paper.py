@@ -116,7 +116,7 @@ class DUTPaperPreprocessor(BasePreprocessor):
         if blocks[3].title_match('目录'):
             blocks.remove(blocks[3])
         self.match_then_handler(
-            blocks[3], '引言', [])
+            blocks[3], '引言', [self.f_rbk_text()])
         if blocks[4].title_match('正文'):
             blocks.remove(blocks[4])
 
@@ -128,7 +128,7 @@ class DUTPaperPreprocessor(BasePreprocessor):
                 break
             cnt += 1
             self.match_then_handler(
-                blocks[index], '*', [])
+                blocks[index], '*', [self.f_rbk_text(), self.f_process_table()])
             index += 1
         main_end = index - 1
 
