@@ -461,7 +461,7 @@ class Block():  # content
     def __init__(self) -> None:
         self.title: str = None
         self.level = -1
-        self.__title_centered = False
+        self.title_centered = False
         self.content_list: List[BaseContent] = []
         self.sub_blocks: List[Block] = []
 
@@ -519,7 +519,7 @@ class Block():  # content
             p_title = paragraph.insert_paragraph_before()
             p_title.style = DM.get_style('Heading '+str(self.level))
 
-            if self.__title_centered:
+            if self.title_centered:
                 p_title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             # 如果是一级，给头上（标题前面）增加分页符
             if self.level == self.Heading_1:

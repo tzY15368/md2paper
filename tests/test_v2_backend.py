@@ -17,10 +17,10 @@ blk_ref = Block()
 blk_c1 = Block()
 blk_c2 = Block()
 
-blk_abs.set_title("摘    要", level=Block.Heading_1)
+blk_abs.set_title("摘    要", level=Block.Heading_1,centered=True)
 blk_c1.set_title("1 稍有常识的人", level=Block.Heading_1)
 blk_c2.set_title("2 没有尝试的人", level=Block.Heading_1)
-blk_ref.set_title("参 考 文 献", level=Block.Heading_1)
+blk_ref.set_title("参 考 文 献", level=Block.Heading_1, centered=True)
 
 c = """Any subsequent access to the "deleted" paragraph object will raise AttributeError, so you should be careful not to keep the reference hanging around, including as a member of a stored value of Document.paragraphs.
 The reason it's not in the library yet is because the general case is much trickier, in particular needing to detect and handle the variety of linked items that can be present in a paragraph; things like a picture, a hyperlink, or chart etc.
