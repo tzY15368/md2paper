@@ -115,10 +115,10 @@ class DUTPaperPreprocessor(BasePreprocessor):
             blocks.remove(blocks[3])
         self.match_then_handler(
             blocks[3], '引言', [])
-        self.match_then_handler(
-            blocks[4], '正文', [])
+        if blocks[4].title_match('正文'):
+            blocks.remove(blocks[4])
 
-        index = 5
+        index = 4
         main_start = index
         cnt = 0
         while index < len(blocks):
