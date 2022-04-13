@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import reduce
 import logging
 from docx.text.paragraph import Paragraph
 from docx.shared import Inches, Cm
@@ -280,7 +281,7 @@ class OrderedList(BaseContent):
         result: List[BaseContent] = [
             item.get_content_list(content_type)
             for item in self.item_list]
-        return result
+        return reduce(lambda x, y: x+y, result)
 
     def render_paragraph(self, paragraph: Paragraph):
         for item in self.item_list:
