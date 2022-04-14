@@ -74,11 +74,12 @@ class Text(BaseContent):
         self.runs: List[Run] = []
         self.force_style = force_style
         self.first_line_indent = first_line_indent
+        self.silenced:bool = False
         if raw_text:
             self.runs.append(Run(raw_text, style))
 
     def add_run(self, run: Run) -> Text:
-        if not isinstance(run,Run):
+        if not isinstance(run, Run):
             raise TypeError("Text: expected Run, got {}".format(type(run)))
         self.runs.append(run)
         return self
@@ -96,9 +97,22 @@ class Text(BaseContent):
     def empty(self) -> bool:
         return len(self.runs) == 0
 
-    def render_paragraph(self, position: Paragraph) -> int:
+    def kill(self):
+        self.silenced = True
+
+    # get_text return text concatenated from all of self.runs
+    def get_text(self)->str:
+        r = ""
+        for run in self.runs:
+            r += run.text
+        return r
+
+    def render_paragraph(self, position: Paragraph):
+        if self.silenced:
+            return
+
         if len(position.runs) != 0:
-            logging.warning(
+            logging.debug(
                 "Text: existing content in paragraph {}".format(position.text))
 
         for run in self.runs:
@@ -167,7 +181,7 @@ class Image(BaseContent):
         super().__init__()
         self.title = title
         self.src = src
-        self.__image = None
+        self.__image: ImageData = None
 
     def set_image_data(self, data: ImageData) -> None:
         self.__image = data
@@ -178,7 +192,7 @@ class Image(BaseContent):
 
         p_text.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p_text.style = DM.get_style(self.image_alt_style)
-        p_text.text = self.title
+        p_text.text = self.title if not self.__image else self.__image.img_alt
 
         if self.__image and self.__image.img_src:
             p_img = paragraph.insert_paragraph_before()
@@ -187,6 +201,9 @@ class Image(BaseContent):
                           self.__image.get_size_in_doc())
             p_img.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             p_img.style = DM.get_style(self.image_alt_style)
+        else:
+            logging.warning(
+                "image: render: actual image {} @ {} not provided".format(self.title, self.src))
 
 
 class Formula(BaseContent):
@@ -194,7 +211,7 @@ class Formula(BaseContent):
 
     def __init__(self, title: str, formula: str, transform_required: bool = True) -> None:
         super().__init__()
-        self.__title: str = title
+        self.title: str = title
         self.__formula: str = formula
         self.__transform_required = transform_required
 
@@ -237,7 +254,7 @@ class Formula(BaseContent):
         cell_idx = table.rows[0].cells[2]
         cell_idx.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
         p = cell_idx.paragraphs[0]
-        p.text = self.__title
+        p.text = self.title
         p.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
         p.style = DM.get_style(self.formula_alt_style)
 
@@ -245,8 +262,9 @@ class Formula(BaseContent):
 class ListItem:
     def __init__(self, content_list: List[BaseContent]) -> None:
         for c in content_list:
-            if not isinstance(c,BaseContent):
-                raise TypeError(f"listitem: expected BaseContent, got {type(c)}")
+            if not isinstance(c, BaseContent):
+                raise TypeError(
+                    f"listitem: expected BaseContent, got {type(c)}")
         self.content_list = content_list
 
     def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
@@ -313,7 +331,7 @@ class Table(BaseContent):
         super().__init__()
         self.__auto_fit = True
         self.__columns_width: List[float] = []
-        self.__title = title
+        self.title = title
         self.table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
@@ -337,7 +355,7 @@ class Table(BaseContent):
         p = paragraph
         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p.style = DM.get_style(self.alt_style)
-        p.text = self.__title
+        p.text = self.title
         table = DM.get_doc().add_table(rows=self.__rows, cols=self.__cols, style='Table Grid')
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = table.allow_autofit = self.__auto_fit
@@ -429,7 +447,7 @@ class Code(BaseContent):
     def render_paragraph(self, paragraph: Paragraph):
         # TODO: FIX ME
         logging.warning("code: render: not yet implemented")
-        paragraph.add_run("code:{}:{}".format(self.language,self.txt))
+        paragraph.add_run("code:{}:{}".format(self.language, self.txt))
 
 
 class Block():  # content
@@ -487,7 +505,7 @@ class Block():  # content
 
     def add_content(self, *args: BaseContent):
         for content in args:
-            if not isinstance(content, BaseContent) or type(content)==BaseContent:
+            if not isinstance(content, BaseContent) or type(content) == BaseContent:
                 raise TypeError("expected BaseContent, got", type(content))
         self.content_list += args
 

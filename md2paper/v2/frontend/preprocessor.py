@@ -1,3 +1,4 @@
+import collections
 import copy
 import logging
 from typing import List, Callable, Union, Dict
@@ -47,6 +48,8 @@ class BasePreprocessor():
         self.handlers: List[PaperPartHandler] = []
 
         self.metadata: Dict[str, str] = {}
+        self.reference_map: collections.OrderedDict[str,
+                                                    backend.BaseContent] = collections.OrderedDict()
 
         # 如果parts之一是*，代表任意多个level1 block
         # 如果part中含*，如“附录* 附录标题”，代表以正则表达式匹配的-

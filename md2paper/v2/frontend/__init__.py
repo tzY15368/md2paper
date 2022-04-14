@@ -19,7 +19,7 @@ class Paper():
     def __init__(self, md_file_path: str, preprocessor: Type[BasePreprocessor]) -> None:
         self.block: Block = Block()
         self.preprocessor: BasePreprocessor = preprocessor(self.block)
-
+        self.md_file_path = md_file_path
         with open(md_file_path) as f:
             data = f.read()
         md_html = markdown.markdown(
@@ -150,7 +150,13 @@ class Paper():
         return Formula(None, math.text)  # with no title
 
     def __get_image(self, img):
-        return Image(img["alt"], img["src"])
+        src_to_md = img.get('src')
+        md_path = os.path.split(self.md_file_path)[0]
+        cwd = os.getcwd()
+        real_src = os.path.join(cwd, md_path, src_to_md)
+
+        img = Image(img['alt'], real_src)
+        return img
 
     def __get_ordered_list(self, ol):
         def get_list_item(li):
