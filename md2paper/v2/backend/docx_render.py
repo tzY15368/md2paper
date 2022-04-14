@@ -357,7 +357,7 @@ class Table(BaseContent):
         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p.style = DM.get_style(self.alt_style)
         p.text = self.title
-        table = DM.get_doc().add_table(rows=self.__rows, cols=self.__cols, style='Table Grid')
+        table = DM.get_doc().add_table(rows=len(self.table), cols=len(self.table[0].row), style='Table Grid')
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = table.allow_autofit = self.__auto_fit
         if not self.__auto_fit:
@@ -378,7 +378,7 @@ class Table(BaseContent):
                     top={
                         "val": 'single', 'color': self.white if not row.has_top_border else self.black},
                     bottom={"val": 'single', "color": self.white if i !=
-                            self.__rows-1 else self.black},
+                            len(self.table)-1 else self.black},
                     start=Table.empty_border_tyle,
                     end=Table.empty_border_tyle
                 )
