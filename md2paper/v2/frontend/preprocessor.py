@@ -101,7 +101,7 @@ class BasePreprocessor():
 
     def register_multimedia_labels(self, boc: Union[backend.BaseContent, backend.Block]):
         # parse表名、公式名、图名
-        if isinstance(boc, backend.BaseContent):
+        if isinstance(boc, backend.BaseContent) or not boc:
             #logging.debug("preprocess: unexpected basecontent type")
             return
 
@@ -137,7 +137,7 @@ class BasePreprocessor():
                     ref_name = fields[0]
                     real_alt = fields[1]
 
-                if boc.level == 1 and boc.title and boc.title[0].isdigit():
+                if boc.title and boc.title[0].isdigit():
                     content_count[backend.Image] += 1
                     real_alt = "图{}.{} {}".format(
                         boc.title[0], content_count[backend.Image], real_alt)
