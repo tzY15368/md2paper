@@ -192,4 +192,14 @@ class Paper():
 
         if update_toc:
             DM.update_toc()
+        
+        # TODO: 把小表放到大表里，然后表头变成大表的一个cell，
+        # 这样实现表头跟表的绑定
+        def keep_table_on_one_page(doc):
+            tags = doc.element.xpath('//w:tr[position() < last()]/w:tc/w:p')
+            for tag in tags:
+                ppr = tag.get_or_add_pPr()
+                ppr.keepNext_val = True
+            
+        keep_table_on_one_page(DM.get_doc())
         DM.save(out_path)
