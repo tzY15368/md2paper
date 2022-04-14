@@ -1,7 +1,7 @@
 import logging
 from md2paper.v2 import backend
 from docx.text.paragraph import Paragraph
-from typing import List, Dict, Tuple, Union
+from typing import Callable, List, Dict, Tuple, Union
 from .metadata import BaseMetadata
 from .preprocessor import BasePreprocessor, PaperPartHandler
 
@@ -77,7 +77,7 @@ class DUTPaperPreprocessor(BasePreprocessor):
             backend.DM.delete_paragraph_by_index(pos)
         return None
 
-    def f_set_abstract_format(self):
+    def f_set_abstract_format(self) -> Callable:
         def set_abstract_format(boc: Union[backend.BaseContent, backend.Block]):
             if isinstance(boc, backend.Block):
                 if boc.title in ['摘要', 'Abstract']:
@@ -86,12 +86,15 @@ class DUTPaperPreprocessor(BasePreprocessor):
                     if len(keyword_text.runs) != 1:
                         logging.error(boc.title + ' 的关键词格式错误')
                     keyword_run = keyword_text.runs[0]
+                    for run in keyword_text.runs:
+                        run.bold = True
                     if boc.title == '摘要':
-                        boc.set_title('摘    要', 1, True)
+                        boc.set_title('摘    要', backend.Block.Heading_1, True)
                         if keyword_run.text.find('关键词：') != 0:
                             logging.error(boc.title + ' 的关键词要以 "关键词：" 开头')
                     else:
-                        boc.set_title('Abstract', 1, True)
+                        boc.set_title(
+                            'Abstract', backend.Block.Heading_1, True)
                         if keyword_run.text.find('Key Words:') != 0:
                             logging.error(
                                 boc.title + ' 的关键词要以 "Key Words:" 开头')
@@ -102,6 +105,17 @@ class DUTPaperPreprocessor(BasePreprocessor):
                 else:
                     logging.error('错误的摘要标题: ' + boc.title)
         return set_abstract_format
+
+    def f_set_intro_format(self) -> Callable:
+        def set_intro_format(boc: Union[backend.BaseContent, backend.Block]):
+            if isinstance(boc, backend.Block):
+                if boc.title != "引言":
+                    logging.error('错误的引言标题: ' + boc.title)
+                    return
+                boc.set_title(
+                    '引    言', level=backend.Block.Heading_1, centered=True)
+                # TODO: more formatting...
+        return set_intro_format
 
     def preprocess(self):
         blocks = self.root_block.sub_blocks
@@ -116,7 +130,7 @@ class DUTPaperPreprocessor(BasePreprocessor):
         if blocks[3].title_match('目录'):
             blocks.remove(blocks[3])
         self.match_then_handler(
-            blocks[3], '引言', [])
+            blocks[3], '引言', [self.f_rbk_text(), self.f_set_intro_format()])
         if blocks[4].title_match('正文'):
             blocks.remove(blocks[4])
 

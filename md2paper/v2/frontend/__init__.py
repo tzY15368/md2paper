@@ -154,7 +154,7 @@ class Paper():
 
     def __get_ordered_list(self, ol):
         def get_list_item(li):
-            if (getattr(li.contents[0],"text",None) == "\n"):  # <p>
+            if (getattr(li.contents[0], "text", None) == "\n"):  # <p>
                 content_list_list = [self.__get_contents(cur)
                                      for cur in li.contents]
                 content_list = reduce(
