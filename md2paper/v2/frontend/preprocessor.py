@@ -146,7 +146,6 @@ class BasePreprocessor():
                 img.set_image_data(img_data)
 
                 if ref_name:
-                    print(self.reference_map)
                     if ref_name in self.reference_map and self.reference_map[ref_name] != content:
                         raise ValueError(
                             "duplicate ref name:{}\ntraceback: {}\nobj:".format(ref_name, initial_alt, content))
@@ -166,7 +165,14 @@ class BasePreprocessor():
                         ref_name = fields[0].strip()
                         _title = fields[1].strip()
                         self.reference_map[ref_name] = content
+                if boc.title and boc.title[0].isdigit():
+                    content_count[backend.Table] += 1
+                    _title = "表{}.{} {}".format(boc.title[0],content_count[backend.Table],_title)
                 content.title = _title
+            elif isinstance(content, backend.Formula):
+                if boc.title and boc.title[0].isdigit():
+                    content_count[backend.Formula] += 1
+                content.title = "（{}.{}）".format(boc.title[0],content_count[backend.Formula])
             else:
                 pass
 
