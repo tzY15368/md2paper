@@ -199,7 +199,7 @@ class DUTPaperPreprocessor(BasePreprocessor):
                 break
             cnt += 1
             self.match_then_handler(
-                blocks[index], '*', [])
+                blocks[index], '*', [self.f_rbk_text(), self.f_process_table()])
             index += 1
         main_end = index - 1
 

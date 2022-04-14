@@ -146,6 +146,90 @@ class BasePreprocessor():
                 self.metadata['title_en'] = self.rbk(boc.sub_blocks[0].title)
         return get_metadata
 
+    def f_process_table(self):
+        def analyse_title(s: str):
+            # ali, title, columns_width
+            # 别名: 表名; 宽度表
+            # 宽度表 = 10% 20% 30% ...
+            if not ':' in s:
+                logging.error("错误表格标题格式：需要别名或标题")
+            sp = s.split(':')
+            sp = [sp[0]] + sp[1].split(';')
+            if len(sp) == 2:
+                ali = self.rbk(sp[0])
+                title = self.rbk(sp[1])
+                columns_width = []
+            elif len(sp) == 3:
+                ali = sp[0]
+                title = self.rbk(sp[1])
+                widths = sp[2].split('%')
+
+                width_sum = 0
+                columns_width = []
+                for width in widths:
+                    w = width.strip()
+                    if w:
+                        width_sum += int(w)
+                        columns_width.append(w/100)
+                if width_sum > 100:
+                    raise ValueError('表格每列宽度和不得超过 100%: ' + s)
+            else:
+                raise ValueError('表的标题格式错误: ' + s)
+
+            return ali, title, columns_width
+
+        def is_border(row: backend.Row):
+            for text in row.row:
+                if text == None:
+                    return False
+                cnt = 0
+                for i in text.raw_text():
+                    if i != '-':
+                        return False
+                    else:
+                        cnt += 1
+                if cnt < 3:
+                    return False
+            return True
+
+        def make_borders(rows: List[backend.Row]):
+            rows[0].has_top_border = True
+            rows[1].has_top_border = True
+            delete_list: List[backend.Row] = []
+            has_top_border = False
+            for i in range(2, len(rows)):
+                if is_border(rows[i]):
+                    delete_list.append(rows[i])
+                    has_top_border = True
+                else:
+                    if has_top_border:
+                        rows[i].has_top_border = True
+                        has_top_border = False
+            for row in delete_list:
+                rows.remove(row)
+
+        def process_table(boc: Union[backend.BaseContent, backend.Block]):
+            if isinstance(boc, backend.Block):
+                # get table title
+                last_content: backend.Text = None
+                table_title_contents: List[backend.Text] = []
+                for content in boc.get_content_list():
+                    if isinstance(content, backend.Table):
+                        table_title_contents.append(last_content)
+                        ali, title, columns_width = analyse_title(
+                            last_content.raw_text())
+                        content.ali = ali
+                        content.title = title
+                        if columns_width:
+                            content.set_columns_width(columns_width)
+                    else:
+                        last_content = content
+                pass  # TODO: delete table_title_contents in boc
+            elif isinstance(boc, backend.Table):
+                make_borders(boc.table)
+                pass  # TODO: register table in refs
+        return process_table
+
     def handler(self, block: backend.Block, functions: List[Callable]):
         pph = PaperPartHandler(block, functions)
         pph.handle()

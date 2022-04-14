@@ -332,6 +332,7 @@ class Table(BaseContent):
         self.__auto_fit = True
         self.__columns_width: List[float] = []
         self.title = title
+        self.ali: str = None  # alias
         self.table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
