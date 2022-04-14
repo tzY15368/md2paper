@@ -3,6 +3,7 @@ import copy
 import logging
 from typing import List, Callable, Type, Union, Dict
 from docx.text.paragraph import Paragraph
+from docx.shared import Cm
 import re
 
 
@@ -49,9 +50,10 @@ class BasePreprocessor():
         self.handlers: List[PaperPartHandler] = []
 
         self.metadata: Dict[str, str] = {}
+        self.content_reference_map: collections.OrderedDict[str,
+                                                            backend.BaseContent] = collections.OrderedDict()
         self.reference_map: collections.OrderedDict[str,
                                                     backend.BaseContent] = collections.OrderedDict()
-
         # 如果parts之一是*，代表任意多个level1 block
         # 如果part中含*，如“附录* 附录标题”，代表以正则表达式匹配的-
         #   -任意多个以附录开头的lv1 block
@@ -99,6 +101,10 @@ class BasePreprocessor():
             parts = parts[offset:]
             i = i + 1
 
+    def register_references(self, boc: Union[backend.BaseContent, backend.Block]):
+
+        pass
+
     def register_multimedia_labels(self, boc: Union[backend.BaseContent, backend.Block]):
         # parse表名、公式名、图名
         if isinstance(boc, backend.BaseContent) or not boc:
@@ -110,7 +116,6 @@ class BasePreprocessor():
             backend.Table: 0,
             backend.Formula: 0
         }
-        print(type(boc),boc)
         content_all = boc.get_content_list(recursive=True)
         for i, content in enumerate(content_all):
             if isinstance(content, backend.Image):
@@ -146,10 +151,10 @@ class BasePreprocessor():
                 img.set_image_data(img_data)
 
                 if ref_name:
-                    if ref_name in self.reference_map and self.reference_map[ref_name] != content:
+                    if ref_name in self.content_reference_map and self.content_reference_map[ref_name] != content:
                         raise ValueError(
                             "duplicate ref name:{}\ntraceback: {}\nobj:".format(ref_name, initial_alt, content))
-                    self.reference_map[ref_name] = content
+                    self.content_reference_map[ref_name] = content
 
             elif isinstance(content, backend.Table):
                 _title = ""
@@ -159,20 +164,56 @@ class BasePreprocessor():
                 else:
                     _title = content_all[i-1].get_text()
                     content_all[i-1].kill()
-                if _title:
-                    if ':' in _title:
-                        fields = _title.split(':')
-                        ref_name = fields[0].strip()
-                        _title = fields[1].strip()
-                        self.reference_map[ref_name] = content
+
+                def analyze_title(s: str):
+                    # ali, title, columns_width
+                    # 别名: 表名; 宽度表
+                    # 宽度表 = 10% 20% 30% ...
+                    if not ':' in s:
+                        logging.error("错误表格标题格式：需要别名或标题")
+                    sp = s.split(':')
+                    sp = [sp[0]] + sp[1].split(';')
+                    if len(sp) == 2:
+                        ali = self.rbk(sp[0])
+                        title = self.rbk(sp[1])
+                        columns_width = []
+                    elif len(sp) == 3:
+                        ali = sp[0]
+                        title = self.rbk(sp[1])
+                        widths = sp[2].split('%')
+
+                        width_sum = 0
+                        columns_width = []
+                        for width in widths:
+                            w = width.strip()
+                            if w:
+                                width_sum += int(w)
+                                columns_width.append(w/100)
+                        if width_sum > 100:
+                            raise ValueError('表格每列宽度和不得超过 100%: ' + s)
+                    else:
+                        raise ValueError('表的标题格式错误: ' + s)
+
+                    return ali, title, columns_width
+
+                ref_name, _title, columns_width = analyze_title(_title)
+
+                if ref_name:
+                    self.content_reference_map[ref_name] = content
+
+                if columns_width:
+                    content.set_columns_width(columns_width)
+
                 if boc.title and boc.title[0].isdigit():
                     content_count[backend.Table] += 1
-                    _title = "表{}.{} {}".format(boc.title[0],content_count[backend.Table],_title)
+                    _title = "表{}.{} {}".format(
+                        boc.title[0], content_count[backend.Table], _title)
                 content.title = _title
             elif isinstance(content, backend.Formula):
                 if boc.title and boc.title[0].isdigit():
                     content_count[backend.Formula] += 1
-                content.title = "（{}.{}）".format(boc.title[0],content_count[backend.Formula])
+                content.title = "（{}.{}）".format(
+                    boc.title[0], content_count[backend.Formula])
             else:
                 pass
 
@@ -217,36 +258,6 @@ class BasePreprocessor():
         return get_metadata
 
     def f_process_table(self):
-        def analyse_title(s: str):
-            # ali, title, columns_width
-            # 别名: 表名; 宽度表
-            # 宽度表 = 10% 20% 30% ...
-            if not ':' in s:
-                logging.error("错误表格标题格式：需要别名或标题")
-            sp = s.split(':')
-            sp = [sp[0]] + sp[1].split(';')
-            if len(sp) == 2:
-                ali = self.rbk(sp[0])
-                title = self.rbk(sp[1])
-                columns_width = []
-            elif len(sp) == 3:
-                ali = sp[0]
-                title = self.rbk(sp[1])
-                widths = sp[2].split('%')
-
-                width_sum = 0
-                columns_width = []
-                for width in widths:
-                    w = width.strip()
-                    if w:
-                        width_sum += int(w)
-                        columns_width.append(w/100)
-                if width_sum > 100:
-                    raise ValueError('表格每列宽度和不得超过 100%: ' + s)
-            else:
-                raise ValueError('表的标题格式错误: ' + s)
-
-            return ali, title, columns_width
 
         def is_border(row: backend.Row):
             for text in row.row:
@@ -277,27 +288,21 @@ class BasePreprocessor():
                         has_top_border = False
             for row in delete_list:
                 rows.remove(row)
-
+                
         def process_table(boc: Union[backend.BaseContent, backend.Block]):
             if isinstance(boc, backend.Block):
                 # get table title
-                last_content: backend.Text = None
-                table_title_contents: List[backend.Text] = []
                 for content in boc.get_content_list():
-                    if isinstance(content, backend.Table):
-                        table_title_contents.append(last_content)
-                        ali, title, columns_width = analyse_title(
-                            last_content.raw_text())
-                        content.ali = ali
-                        content.title = title
-                        if columns_width:
-                            content.set_columns_width(columns_width)
-                    else:
-                        last_content = content
-                pass  # TODO: delete table_title_contents in boc
+                    if isinstance(content, backend.Text):
+                        # TODO: WHAT'S THIS FOR?
+                        pass
             elif isinstance(boc, backend.Table):
                 make_borders(boc.table)
-                pass  # TODO: register table in refs
+                for content in boc.get_content_list():
+                    if isinstance(content,backend.Text):
+                        content.force_style = "图名中文"
+                        content.first_line_indent = Cm(0)
+
         return process_table
 
     def handler(self, block: backend.Block, functions: List[Callable]):

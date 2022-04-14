@@ -6,6 +6,7 @@ from docx.text.paragraph import Paragraph
 from typing import Callable, List, Dict, Tuple, Union
 from .metadata import BaseMetadata
 from .preprocessor import BasePreprocessor, PaperPartHandler
+from docx.shared import Cm
 
 
 class DUTPaperMetaData(BaseMetadata):
@@ -111,13 +112,19 @@ class DUTPaperPreprocessor(BasePreprocessor):
     def f_set_intro_format(self) -> Callable:
         def set_intro_format(boc: Union[backend.BaseContent, backend.Block]):
             if isinstance(boc, backend.Block):
-                if boc.title != "引言":
-                    logging.error('错误的引言标题: ' + boc.title)
-                    return
                 boc.set_title(
                     '引    言', level=backend.Block.Heading_1, centered=True)
                 # TODO: more formatting...
         return set_intro_format
+
+    def set_ref_format(self, boc: Union[backend.BaseContent, backend.Block]):
+        if isinstance(boc, backend.Block):
+            boc.set_title(
+                '参 考 文 献', level=backend.Block.Heading_1, centered=True)
+            for content in boc.get_content_list():
+                if isinstance(content, backend.Text):
+                    content.force_style = "参考文献正文"
+                    content.first_line_indent = Cm(0)
 
     def preprocess(self):
         blocks = self.root_block.sub_blocks
@@ -151,7 +158,11 @@ class DUTPaperPreprocessor(BasePreprocessor):
         self.match_then_handler(
             blocks[main_end+1], '结论', [])
         self.match_then_handler(
-            blocks[main_end+2], '参考文献', [])
+            blocks[main_end+2], '参考文献', [
+                self.f_rbk_text(),
+                self.set_ref_format,
+                self.register_references
+            ])
 
         index = main_end+3
         append_start = index
