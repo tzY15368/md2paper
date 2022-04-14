@@ -74,7 +74,7 @@ class Text(BaseContent):
         self.runs: List[Run] = []
         self.force_style = force_style
         self.first_line_indent = first_line_indent
-        self.silenced:bool = False
+        self.silenced: bool = False
         if raw_text:
             self.runs.append(Run(raw_text, style))
 
@@ -101,7 +101,7 @@ class Text(BaseContent):
         self.silenced = True
 
     # get_text return text concatenated from all of self.runs
-    def get_text(self)->str:
+    def get_text(self) -> str:
         r = ""
         for run in self.runs:
             r += run.text
@@ -347,9 +347,9 @@ class Table(BaseContent):
         self.__columns_width = widths
 
     def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
-        result: List[BaseContent] = [
-            row.get_content_list(content_type)
-            for row in self.table]
+        result: List[BaseContent] = []
+        for row in self.table:
+            result += row.get_content_list(content_type)
         return result
 
     def render_paragraph(self, paragraph: Paragraph):

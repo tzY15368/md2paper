@@ -1,9 +1,10 @@
 import collections
 import copy
 import logging
-from typing import List, Callable, Union, Dict
+from typing import List, Callable, Type, Union, Dict
 from docx.text.paragraph import Paragraph
 import re
+
 
 from md2paper.v2 import backend
 
@@ -98,13 +99,76 @@ class BasePreprocessor():
             parts = parts[offset:]
             i = i + 1
 
-    @classmethod
-    def register_label(cls, alt_name: str, content: backend.BaseContent, index: int):
-        pass
+    def register_multimedia_labels(self, boc: Union[backend.BaseContent, backend.Block]):
+        # parse表名、公式名、图名
+        if isinstance(boc, backend.BaseContent):
+            #logging.debug("preprocess: unexpected basecontent type")
+            return
 
-    @classmethod
-    def register_ref(cls, alt_name: str, content: backend.Text):
-        pass
+        content_count: Dict[Type, int] = {
+            backend.Image: 0,
+            backend.Table: 0,
+            backend.Formula: 0
+        }
+        print(type(boc),boc)
+        content_all = boc.get_content_list(recursive=True)
+        for i, content in enumerate(content_all):
+            if isinstance(content, backend.Image):
+                img = content
+                initial_alt = img.title
+                img_alt = initial_alt
+                real_width = 0
+                ref_name = ''
+                real_alt = img_alt
+                if ';' in img_alt:
+                    fields = str(img_alt).split(';')
+                    if len(fields) != 2:
+                        continue
+                    img_alt = fields[0]
+                    width_field = fields[1].strip()
+                    if width_field:
+                        if '%' not in width_field:
+                            raise ValueError(
+                                "image: invalid width:" + width_field)
+                        real_width = float(width_field[:-1])/100
+
+                if ':' in img_alt:
+                    fields = str(img_alt).split(':')
+                    ref_name = fields[0]
+                    real_alt = fields[1]
+
+                if boc.level == 1 and boc.title and boc.title[0].isdigit():
+                    content_count[backend.Image] += 1
+                    real_alt = "图{}.{} {}".format(
+                        boc.title[0], content_count[backend.Image], real_alt)
+                img_data = backend.ImageData(img.src, alt=real_alt,
+                                             width_ratio=real_width)
+                img.set_image_data(img_data)
+
+                if ref_name:
+                    print(self.reference_map)
+                    if ref_name in self.reference_map and self.reference_map[ref_name] != content:
+                        raise ValueError(
+                            "duplicate ref name:{}\ntraceback: {}\nobj:".format(ref_name, initial_alt, content))
+                    self.reference_map[ref_name] = content
+
+            elif isinstance(content, backend.Table):
+                _title = ""
+                if not (i-1 > 0 and isinstance(content_all[i-1], backend.Text)):
+                    logging.warning(
+                        "title of table went missing, content offset at {}".format(i))
+                else:
+                    _title = content_all[i-1].get_text()
+                    content_all[i-1].kill()
+                if _title:
+                    if ':' in _title:
+                        fields = _title.split(':')
+                        ref_name = fields[0].strip()
+                        _title = fields[1].strip()
+                        self.reference_map[ref_name] = content
+                content.title = _title
+            else:
+                pass
 
     def rbk(self, text: str):  # remove_blank
         # 删除换行符
