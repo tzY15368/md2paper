@@ -267,6 +267,12 @@ class ListItem:
                     f"listitem: expected BaseContent, got {type(c)}")
         self.content_list = content_list
 
+    def has_sub_list(self) -> bool:
+        for c in self.content_list:
+            if isinstance(c, OrderedList):
+                return True
+        return False
+
     def get_content_list(self, content_type: Type[BaseContent] = None) -> List[BaseContent]:
         result: List[BaseContent] = []
         for content in self.content_list:
@@ -275,23 +281,57 @@ class ListItem:
             result += content.get_content_list(content_type)
         return result
 
-    def render_paragraph(self, paragraph: Paragraph):
+    def render_paragraph(self, paragraph: Paragraph, level=1):
+        cnt = 1
         for i, content in enumerate(self.content_list):
-            if i == len(self.content_list)-1:
-                p = paragraph
-            else:
-                p = paragraph.insert_paragraph_before()
+            print(type(content),level,cnt,"" if not isinstance(content,Text) else content.get_text())
+            par = paragraph.insert_paragraph_before()
+            if isinstance(content, Text) and content.force_style != "图名中文" and content.get_text():
+                
+                if level == 1:
+                    s = "（{}） ".format(cnt)
+                elif level == 2:
+                    s = "{} ".format(chr(cnt+0x2460))
+                else:
+                    raise ValueError("unexpected list level"+str(level))
+                content.runs.insert(0, Run(s))
+                cnt += 1
 
-            li_run = Run("TODO")
-            if isinstance(content, Text):
-                content.runs.insert(0, li_run)
-            else:
-                p2 = p.insert_paragraph_before()
-                Text().add_run(li_run).render_paragraph(p2)
-            content.render_paragraph(p)
+            elif isinstance(content, OrderedList):
+                content.list_level += 1
+            
+            content.render_paragraph(par)
+
+            if isinstance(content, OrderedList):
+                content.list_level -= 1
+
+            if i != len(self.content_list)-1:
+                no_spacing_content = [Text, OrderedList]
+                if type(self.content_list[i+1]) not in no_spacing_content:
+                    paragraph.insert_paragraph_before().text = "Bbb"
+                else:
+                    if type(content) not in no_spacing_content:
+                        paragraph.insert_paragraph_before().text = "aaa"
+
+        # for i, content in enumerate(self.content_list):
+        #     if i == len(self.content_list)-1:
+        #         p = paragraph
+        #     else:
+        #         p = paragraph.insert_paragraph_before()
+
+        #     li_run = Run("TODO")
+        #     if isinstance(content, Text):
+        #         content.runs.insert(0, li_run)
+        #     else:
+        #         p2 = p.insert_paragraph_before()
+        #         Text().add_run(li_run).render_paragraph(p2)
+        #     content.render_paragraph(p)
 
 
 class OrderedList(BaseContent):
+
+    list_level = 1
+
     def __init__(self, item_list: List[ListItem]) -> None:
         self.item_list = item_list
 
@@ -303,7 +343,7 @@ class OrderedList(BaseContent):
 
     def render_paragraph(self, paragraph: Paragraph):
         for item in self.item_list:
-            item.render_paragraph(paragraph)
+            item.render_paragraph(paragraph, level=self.list_level)
 
 
 # row of table
@@ -357,7 +397,8 @@ class Table(BaseContent):
         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p.style = DM.get_style(self.alt_style)
         p.text = self.title
-        table = DM.get_doc().add_table(rows=len(self.table), cols=len(self.table[0].row), style='Table Grid')
+        table = DM.get_doc().add_table(rows=len(self.table),
+                                       cols=len(self.table[0].row), style='Table Grid')
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = table.allow_autofit = self.__auto_fit
         if not self.__auto_fit:
@@ -457,26 +498,6 @@ class Block():  # content
     Heading_2 = 2
     Heading_3 = 3
     Heading_4 = 4
-
-    @classmethod
-    def handle_references(cls, blk: Block, reg_callback: Callable):
-        for content in blk.get_content_list(Text):
-            # TODO:检查引用
-            alt_name = "xxx"
-            if True:
-                reg_callback(alt_name, content)
-
-    @classmethod
-    def handle_labels(cls, blk: Block, reg_callback: Callable):
-        # 从block title推断index
-        if not blk.title or blk.level != Block.Heading_1 or \
-                (len(blk.title) > 1 and not blk.title[0].isdigit()):
-            raise ValueError("unexpected index, should be index of chapter")
-        index = int(blk.title[0])
-
-        for content in blk.get_content_list():
-            if type(content) in [Text, Image, Formula]:
-                reg_callback(content.title, content, index)
 
     def __init__(self) -> None:
         self.title: str = None

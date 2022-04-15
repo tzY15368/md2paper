@@ -70,7 +70,6 @@ class DUTPaperPreprocessor(BasePreprocessor):
             "学号": "234234",
             "指导教师": "nnnnnnnnnnn",
         })
-        # TODO: END OF TODO
         print(meta.__dict__)
         meta.render_template()
 
