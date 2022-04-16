@@ -5,6 +5,7 @@ from typing import List, Callable, Tuple, Type, Union, Dict
 from docx.text.paragraph import Paragraph
 from docx.shared import Cm
 import re
+from functools import reduce
 
 
 from md2paper.v2 import backend
@@ -51,9 +52,11 @@ class BasePreprocessor():
 
         self.metadata: Dict[str, str] = {}
         self.content_reference_map: collections.OrderedDict[str,
-                                                            backend.BaseContent] = collections.OrderedDict()
+                                                            Union[backend.Image,
+                                                                  backend.Table,
+                                                                  backend.Formula]] = collections.OrderedDict()
         self.reference_map: collections.OrderedDict[str,
-                                                    backend.BaseContent] = collections.OrderedDict()
+                                                    int] = collections.OrderedDict()
         # 如果parts之一是*，代表任意多个level1 block
         # 如果part中含*，如“附录* 附录标题”，代表以正则表达式匹配的-
         #   -任意多个以附录开头的lv1 block
@@ -72,13 +75,25 @@ class BasePreprocessor():
         return None
 
     def register_references(self, boc: Union[backend.BaseContent, backend.Block]):
-
-        pass
+        if not isinstance(boc, backend.Text):
+            return
+        for run in boc.runs:
+            if not run.reference:
+                continue
+            ali = run.text
+            if ali.find(",") == -1:
+                if ali not in self.content_reference_map:
+                    if ali not in self.reference_map:
+                        self.reference_map[ali] = len(self.reference_map) + 1
+            else:
+                alis = ali.split(",")
+                for ali in alis:
+                    if ali not in self.reference_map:
+                        self.reference_map[ali] = len(self.reference_map) + 1
 
     def register_multimedia_labels(self, boc: Union[backend.BaseContent, backend.Block]):
         # parse表名、公式名、图名
-        if isinstance(boc, backend.BaseContent) or not boc:
-            #logging.debug("preprocess: unexpected basecontent type")
+        if not (isinstance(boc, backend.Block) and boc.level == backend.Block.Heading_1):
             return
 
         content_count: Dict[Type, int] = {
@@ -86,44 +101,97 @@ class BasePreprocessor():
             backend.Table: 0,
             backend.Formula: 0
         }
-        block_id = ""
+        block_id = "未支持"
         if boc.title and boc.title[0].isdigit():
             block_id = boc.title[0]
+        # TODO: 添加附录编号支持
+
+        def make_index(id: int):
+            if block_id[0].isdigit():
+                return "{}.{}".format(block_id, id)
+            else:
+                return "{}{}".format(block_id, id)
+
         content_all = boc.get_content_list(recursive=True)
 
         for i, content in enumerate(content_all):
-            
-            if isinstance(content, backend.Image):
-                if not content.image:
-                    raise RuntimeError("register labels MUST happen after f_process_image")
-                base = ""
-                if block_id:
+            if isinstance(content, backend.Image) or isinstance(content, backend.Table) or isinstance(content, backend.Formula):
+                if isinstance(content, backend.Image):
+                    if not content.image:
+                        raise RuntimeError(
+                            "register labels MUST happen after f_process_image")
+                    base = ""
                     content_count[backend.Image] += 1
-                    base = "图{}.{} ".format(
-                        block_id if block_id else "未定义", content_count[backend.Image])
-                content.image.img_alt = base + content.image.img_alt
+                    content.image.img_alt = "图{}  {}".format(
+                        make_index(content_count[backend.Image]), content.image.img_alt)
+                    content.refname = "图" + \
+                        make_index(content_count[backend.Image])
+                elif isinstance(content, backend.Table):
+                    content_count[backend.Table] += 1
+                    content.title = "表{}  {}".format(
+                        make_index(content_count[backend.Table]), content.title)
+                    content.refname = "表" + \
+                        make_index(content_count[backend.Table])
+                elif isinstance(content, backend.Formula):
+                    content_count[backend.Formula] += 1
+                    content.title = "（{}）".format(
+                        make_index(content_count[backend.Formula]))
+                    content.refname = "式" + \
+                        make_index(content_count[backend.Formula])
 
                 if content.alias:
                     if content.alias in self.content_reference_map and \
-                        self.content_reference_map[content.alias] != content:
+                            self.content_reference_map[content.alias] != content:
                         raise ValueError(
                             "duplicate ref name:{}\ntraceback: {}\nobj:".format(content.alias, content.title, content))
                     self.content_reference_map[content.alias] = content
 
-            elif isinstance(content, backend.Table):
-
-                if block_id:
-                    content_count[backend.Table] += 1
-                    _title = "表{}.{} {}".format(
-                        block_id, content_count[backend.Table], content.title)
-                content.title = _title
-            elif isinstance(content, backend.Formula):
-                if block_id:
-                    content_count[backend.Formula] += 1
-                content.title = "（{}.{}）".format(
-                    block_id, content_count[backend.Formula])
+    def replace_references_text(self, boc: Union[backend.BaseContent, backend.Block]):
+        if not isinstance(boc, backend.Text):
+            return
+        is_text = False
+        for run in boc.runs:
+            if not run.reference:
+                if run.text.endswith('文献'):
+                    is_text = True
+                else:
+                    is_text = False
+                continue
+            ali = run.text
+            if ali.find(",") == -1:
+                if ali in self.content_reference_map:
+                    run.text = self.content_reference_map[ali].refname
+                    is_text = True
+                elif ali in self.reference_map:
+                    run.text = "[{}]".format(self.reference_map[ali])
+                else:
+                    raise ValueError('引用没有注册，请联系维护人员: ' + ali)
             else:
-                pass
+                alis = ali.split(",")
+                index_list = []
+                for ali in alis:
+                    if ali not in self.reference_map:
+                        raise ValueError('引用没有注册，请联系维护人员: ' + ali)
+                    index_list.append(self.reference_map[ali])
+                index_list.sort()
+                index_list = [[x, x] for x in index_list]
+                short_list = index_list[:1]
+                for index_pair in index_list[1:]:
+                    if short_list[-1][1]+1 == index_pair[0]:
+                        short_list[-1][1] = index_pair[1]
+                    else:
+                        short_list.append(index_pair)
+                short_list = [str(x[0]) if x[0] == x[1]
+                              else "{}-{}".format(x[0], x[1])
+                              for x in short_list]
+                run.text = "[{}]".format(
+                    reduce(lambda x, y: x+','+y, short_list))
+            if is_text:
+                run.reference = False
+            else:
+                run.reference = False
+                run.superscript = True
+            is_text = False
 
     def rbk(self, text: str):  # remove_blank
         # 删除换行符
@@ -194,9 +262,7 @@ class BasePreprocessor():
             return (ref_name, real_alt, real_width)
 
         def process_image(boc: Union[backend.BaseContent, backend.Block]):
-            if isinstance(boc, backend.BaseContent) or not boc:
-                logging.debug(
-                    "unexpected {} in process_image".format(type(boc)))
+            if not (isinstance(boc, backend.Block) and boc.level == backend.Block.Heading_1):
                 return
             content_all = boc.get_content_list(recursive=True)
             for i, content in enumerate(content_all):
@@ -278,9 +344,9 @@ class BasePreprocessor():
                 rows.remove(row)
 
         def process_table(boc: Union[backend.BaseContent, backend.Block]):
-            if isinstance(boc, backend.Block):
+            if isinstance(boc, backend.Block) and boc.level == backend.Block.Heading_1:
                 # get table title
-                all_content = boc.get_content_list()
+                all_content = boc.get_content_list(recursive=True)
                 for i, content in enumerate(all_content):
                     if isinstance(content, backend.Table):
                         if i-1 < 0 or not isinstance(all_content[i-1], backend.Text):

@@ -22,7 +22,7 @@ class Run():
     Formula = 8
     Superscript = 16
     Subscript = 32
-    Reference = 64 | 1  # all `[ref]` as Normal style for now
+    Reference = 64  # all `[ref]` as Normal style for now
 
     def __init__(self, text: str, style: int = 0, tabstop: bool = False, transform_required: bool = True) -> None:
         self.text = text
@@ -34,6 +34,7 @@ class Run():
         self.subscript = style & self.Subscript != 0
         self.superscript = style & self.Superscript != 0
         self.__tabstop = tabstop
+        self.reference = style & self.Reference != 0
 
     def render_run(self, run):
         if self.formula and self.text:
@@ -183,6 +184,7 @@ class Image(BaseContent):
         self.src = src
         self.image: ImageData = None
         self.alias = None
+        self.refname: str = None
 
     def set_image_data(self, data: ImageData) -> None:
         self.image = data
@@ -214,6 +216,7 @@ class Formula(BaseContent):
         super().__init__()
         self.title: str = title
         self.alias = None
+        self.refname: str = None
         self.__formula: str = formula
         self.__transform_required = transform_required
 
@@ -345,6 +348,7 @@ class Table(BaseContent):
         self.__columns_width: List[float] = []
         self.title = title
         self.alias: str = None  # alias
+        self.refname: str = None
         self.table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
@@ -508,7 +512,8 @@ class Block():  # content
     def get_content_list(self, content_type: Type[BaseContent] = None, recursive: bool = False) -> List[BaseContent]:
         result: List[BaseContent] = []
         for content in self.content_list:
-            if not content: continue
+            if not content:
+                continue
             if content_type == None or isinstance(content, content_type):
                 result.append(content)
             result += content.get_content_list(content_type)

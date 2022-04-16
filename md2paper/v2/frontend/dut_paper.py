@@ -195,4 +195,5 @@ class DUTPaperPreprocessor(BasePreprocessor):
         # secend pass:
 
         for i in range(main_start, main_end+1):
-            self.handler(blocks[i], [])
+            self.handler(blocks[i], [self.register_references,
+                                     self.replace_references_text])
