@@ -150,7 +150,12 @@ class DUTPaperPreprocessor(BasePreprocessor):
                 break
             cnt += 1
             self.match_then_handler(
-                blocks[index], '*', [self.f_rbk_text(), self.f_process_table(), self.register_multimedia_labels])
+                blocks[index], '*', [
+                    self.f_rbk_text(), 
+                    self.f_process_table(), 
+                    self.f_process_img(),
+                    self.f_process_formula(),
+                    self.register_multimedia_labels])
             index += 1
         main_end = index - 1
 

@@ -181,10 +181,11 @@ class Image(BaseContent):
         super().__init__()
         self.title = title
         self.src = src
-        self.__image: ImageData = None
+        self.image: ImageData = None
+        self.alias = None
 
     def set_image_data(self, data: ImageData) -> None:
-        self.__image = data
+        self.image = data
 
     # 图片上下换行问题均由block管理，Image的render只负责图片和图题
     def render_paragraph(self, paragraph: Paragraph):
@@ -192,13 +193,13 @@ class Image(BaseContent):
 
         p_text.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         p_text.style = DM.get_style(self.image_alt_style)
-        p_text.text = self.title if not self.__image else self.__image.img_alt
+        p_text.text = self.title if not self.image else self.image.img_alt
 
-        if self.__image and self.__image.img_src:
+        if self.image and self.image.img_src:
             p_img = paragraph.insert_paragraph_before()
             r = p_img.add_run()
-            r.add_picture(self.__image.img_src, *
-                          self.__image.get_size_in_doc())
+            r.add_picture(self.image.img_src, *
+                          self.image.get_size_in_doc())
             p_img.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             p_img.style = DM.get_style(self.image_alt_style)
         else:
@@ -212,6 +213,7 @@ class Formula(BaseContent):
     def __init__(self, title: str, formula: str, transform_required: bool = True) -> None:
         super().__init__()
         self.title: str = title
+        self.alias = None
         self.__formula: str = formula
         self.__transform_required = transform_required
 
@@ -282,50 +284,20 @@ class ListItem:
         return result
 
     def render_paragraph(self, paragraph: Paragraph, level=1):
-        cnt = 1
+
         for i, content in enumerate(self.content_list):
-            print(type(content),level,cnt,"" if not isinstance(content,Text) else content.get_text())
-            par = paragraph.insert_paragraph_before()
-            if isinstance(content, Text) and content.force_style != "图名中文" and content.get_text():
-                
-                if level == 1:
-                    s = "（{}） ".format(cnt)
-                elif level == 2:
-                    s = "{} ".format(chr(cnt+0x2460))
-                else:
-                    raise ValueError("unexpected list level"+str(level))
-                content.runs.insert(0, Run(s))
-                cnt += 1
+            if i == len(self.content_list)-1:
+                p = paragraph
+            else:
+                p = paragraph.insert_paragraph_before()
 
-            elif isinstance(content, OrderedList):
-                content.list_level += 1
-            
-            content.render_paragraph(par)
-
-            if isinstance(content, OrderedList):
-                content.list_level -= 1
-
-            if i != len(self.content_list)-1:
-                no_spacing_content = [Text, OrderedList]
-                if type(self.content_list[i+1]) not in no_spacing_content:
-                    paragraph.insert_paragraph_before().text = "Bbb"
-                else:
-                    if type(content) not in no_spacing_content:
-                        paragraph.insert_paragraph_before().text = "aaa"
-
-        # for i, content in enumerate(self.content_list):
-        #     if i == len(self.content_list)-1:
-        #         p = paragraph
-        #     else:
-        #         p = paragraph.insert_paragraph_before()
-
-        #     li_run = Run("TODO")
-        #     if isinstance(content, Text):
-        #         content.runs.insert(0, li_run)
-        #     else:
-        #         p2 = p.insert_paragraph_before()
-        #         Text().add_run(li_run).render_paragraph(p2)
-        #     content.render_paragraph(p)
+            li_run = Run("TODO")
+            if isinstance(content, Text):
+                content.runs.insert(0, li_run)
+            else:
+                p2 = p.insert_paragraph_before()
+                Text().add_run(li_run).render_paragraph(p2)
+            content.render_paragraph(p)
 
 
 class OrderedList(BaseContent):
@@ -372,7 +344,7 @@ class Table(BaseContent):
         self.__auto_fit = True
         self.__columns_width: List[float] = []
         self.title = title
-        self.ali: str = None  # alias
+        self.alias: str = None  # alias
         self.table: List[Row] = table
         if len(table) < 1:
             raise ValueError("invalid table content")
@@ -536,6 +508,7 @@ class Block():  # content
     def get_content_list(self, content_type: Type[BaseContent] = None, recursive: bool = False) -> List[BaseContent]:
         result: List[BaseContent] = []
         for content in self.content_list:
+            if not content: continue
             if content_type == None or isinstance(content, content_type):
                 result.append(content)
             result += content.get_content_list(content_type)
