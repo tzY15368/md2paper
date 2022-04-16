@@ -320,8 +320,25 @@ class BasePreprocessor():
         return process_image
 
     def f_process_formula(self) -> Callable:
-        def process_formula(*args):
-            pass
+        def process_formula(boc: Union[backend.BaseContent, backend.Block]):
+            if isinstance(boc, backend.Block) and boc.level == backend.Block.Heading_1:
+                # get formula title or alias
+                all_content = boc.get_content_list(recursive=True)
+                for i, content in enumerate(all_content):
+                    if isinstance(content, backend.Formula):
+                        if i-1 < 0 or not isinstance(all_content[i-1], backend.Text):
+                            logging.warning(
+                                "formula header missing, expecting text before table")
+                            continue
+                        alias = all_content[i-1].get_text()
+                        all_content[i-1].kill()
+                        content.title = alias
+                        content.alias = alias
+            elif isinstance(boc, backend.Formula):
+                pass  # TODO: transform if need
+            elif isinstance(boc, backend.Text):
+                pass  # TODO: transform if need
+
         return process_formula
 
     def f_process_table(self) -> Callable:
