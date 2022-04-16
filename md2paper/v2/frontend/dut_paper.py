@@ -197,3 +197,8 @@ class DUTPaperPreprocessor(BasePreprocessor):
         for i in range(main_start, main_end+1):
             self.handler(blocks[i], [self.register_references,
                                      self.replace_references_text])
+        for i in range(append_start, append_end+1):
+            self.handler(blocks[i], [self.register_references,
+                                     self.replace_references_text])
+        self.handler(blocks[main_end+2],
+                     [self.filt_references_part])  # TODO filt

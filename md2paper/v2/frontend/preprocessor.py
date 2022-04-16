@@ -193,6 +193,50 @@ class BasePreprocessor():
                 run.superscript = True
             is_text = False
 
+    def filt_references_part(self, boc: Union[backend.BaseContent, backend.Block]):
+        if not (isinstance(boc, backend.Block) and boc.level == backend.Block.Heading_1):
+            return
+
+        def filt_references(code: backend.Code) -> List[Tuple[int, backend.Text]]:
+            if code.language != 'literature':
+                return []
+
+            results: List[Tuple[int, backend.Text]] = []
+            txts = code.txt.split('\n')
+            for ref_item in txts:
+                if not ref_item:
+                    continue
+                pos = ref_item.find("]")
+                if not (ref_item[0] == "[" and pos != -1):
+                    raise ValueError("参考文献条目应该以 `[索引]` 开头: " + ref_item)
+                ali = ref_item[1: pos]
+                item = ref_item[pos+1:].strip()
+                if ali in self.reference_map:
+                    id = self.reference_map[ali]
+                    item = '[{}] {}'.format(id, item)
+                    text = backend.Text(item)
+                    text.first_line_indent = -backend.Text.two_chars_length
+                    text.force_style = "参考文献正文"
+                    results.append((id, text))
+
+            return results
+
+        code_list: List[backend.Code] = boc.get_content_list(
+            content_type=backend.Code, recursive=True)
+        tuple_list_list = [filt_references(code) for code in code_list]
+        tuple_list = reduce(lambda x, y: x+y, tuple_list_list)
+        tuple_list.sort(key=lambda k: k[0])
+
+        for i, (id, text) in enumerate(tuple_list):
+            if not i + 1 == id:
+                logging.error('参考文献编号不递增，可能缺少或有重复')
+                break
+        if len(tuple_list) != len(self.reference_map):
+            logging.error('参考文献可能缺少或有重复')
+
+        boc.content_list = [x[1] for x in tuple_list]
+        boc.sub_blocks.clear()
+
     def rbk(self, text: str):  # remove_blank
         # 删除换行符
         text = text.replace("\n", " ")
