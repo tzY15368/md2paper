@@ -128,21 +128,29 @@ class DUTPaperPreprocessor(BasePreprocessor):
     def preprocess(self):
         blocks = self.root_block.sub_blocks
 
+        index = 0
         # first pass:
-        self.match_then_handler(
-            blocks[0], '*', [self.f_rbk_text(), self.f_get_metadata()])
-        self.match_then_handler(
-            blocks[1], '摘要', [self.f_rbk_text(), self.f_set_abstract_format()])
-        self.match_then_handler(
-            blocks[2], 'Abstract', [self.f_rbk_text(), self.f_set_abstract_format()])
-        if blocks[3].title_match('目录'):
-            blocks.remove(blocks[3])
-        self.match_then_handler(
-            blocks[3], '引言', [self.f_rbk_text(), self.f_set_intro_format()])
-        if blocks[4].title_match('正文'):
-            blocks.remove(blocks[4])
+        self.handler(blocks[index], [self.f_rbk_text(), self.f_get_metadata()])
+        blocks.remove(blocks[index])
 
-        index = 4
+        self.match_then_handler(
+            blocks[index], '摘要', [self.f_rbk_text(), self.f_set_abstract_format()])
+        index += 1
+
+        self.match_then_handler(
+            blocks[index], 'Abstract', [self.f_rbk_text(), self.f_set_abstract_format()])
+        index += 1
+
+        if blocks[index].title_match('目录'):
+            blocks.remove(blocks[index])
+
+        self.match_then_handler(
+            blocks[index], '引言', [self.f_rbk_text(), self.f_set_intro_format()])
+        index += 1
+
+        if blocks[index].title_match('正文'):
+            blocks.remove(blocks[index])
+
         main_start = index
         cnt = 0
         while index < len(blocks):
@@ -151,8 +159,8 @@ class DUTPaperPreprocessor(BasePreprocessor):
             cnt += 1
             self.match_then_handler(
                 blocks[index], '*', [
-                    self.f_rbk_text(), 
-                    self.f_process_table(), 
+                    self.f_rbk_text(),
+                    self.f_process_table(),
                     self.f_process_img(),
                     self.f_process_formula(),
                     self.register_multimedia_labels])
